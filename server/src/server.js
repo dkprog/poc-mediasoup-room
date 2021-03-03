@@ -58,6 +58,12 @@ function startSignalingServer() {
       routerRtpCapabilities: router.rtpCapabilities,
     })
 
+    socket.on('disconnecting', () => {
+      if (socket.rooms.has('room')) {
+        io.to('room').emit('peer-left', { socketId: socket.id })
+      }
+    })
+
     socket.on('disconnect', async () => {
       console.log('client disconnect', { socketId: socket.id })
       await closePeer(socket.id)
@@ -166,7 +172,11 @@ function startSignalingServer() {
 
     socket.on('join', (ack) => {
       socket.join('room')
-      ack()
+      ack({
+        onlinePeers: Array.from(
+          io.of('/').adapter.rooms.get('room').values()
+        ).filter((socketId) => socketId !== socket.id),
+      })
       socket.to('room').emit('peer-joined', { socketId: socket.id })
     })
 

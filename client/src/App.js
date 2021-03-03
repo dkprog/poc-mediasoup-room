@@ -31,6 +31,7 @@ function App() {
   const [client, setClient] = useState(null)
   const [sendTransport, setSendTransport] = useState(null)
   const [, /*cameraVideoProducer*/ setCameraVideoProducer] = useState(null)
+  const [, /*onlinePeers*/ setOnlinePeers] = useState([])
 
   useEffect(() => {
     async function startCamera() {
@@ -230,10 +231,18 @@ function App() {
 
     const onPeerJoinedRoom = ({ socketId }) => {
       console.log(`peer joined room`, { socketId })
+      setOnlinePeers((onlinePeers) =>
+        onlinePeers
+          .filter((peerSocketId) => peerSocketId !== socketId)
+          .concat(socketId)
+      )
     }
 
     const onPeerLeftRoom = ({ socketId }) => {
       console.log(`peer left room`, { socketId })
+      setOnlinePeers((onlinePeers) =>
+        onlinePeers.filter((peerSocketId) => peerSocketId !== socketId)
+      )
     }
 
     client.on('connect', onConnect)
@@ -253,8 +262,10 @@ function App() {
 
   const onJoinRoomButtonClick = () => {
     if (client) {
-      client.emit('join', () => {
+      client.emit('join', ({ onlinePeers }) => {
+        console.log('joined', { onlinePeers })
         setHasJoinedRoom(true)
+        setOnlinePeers(onlinePeers)
       })
     }
   }
@@ -263,6 +274,7 @@ function App() {
     if (client) {
       client.emit('leave', () => {
         setHasJoinedRoom(false)
+        setOnlinePeers([])
       })
     }
   }
