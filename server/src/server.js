@@ -173,6 +173,78 @@ function startSignalingServer() {
       }
     )
 
+    socket.on(
+      'recv-track',
+      async ({ toSocketId, mediaTag, rtpCapabilities }, ack) => {
+        console.log('recv-track', {
+          socketId: socket.id,
+          toSocketId,
+          mediaTag,
+          rtpCapabilities,
+        })
+
+        const producer = Array.from(producers.values()).find(
+          (p) =>
+            p.appData.mediaTag === mediaTag && p.appData.socketId === toSocketId
+        )
+
+        if (!producer) {
+          ack({
+            error: `service-side producer for ${toSocketId}:${mediaTag} not found`,
+          })
+          return
+        }
+
+        if (!router.canConsume({ producerId: producer.id, rtpCapabilities })) {
+          ack({
+            error: `client cannot consume ${toSocketId}:${mediaTag}`,
+          })
+          return
+        }
+
+        let transport = Array.from(transports.values()).find(
+          (t) =>
+            t.appData.socketId === socket.id &&
+            t.appData.clientDirection === 'recv'
+        )
+
+        if (!transport) {
+          ack({
+            error: `server-side recv transport for ${socket.id} not found`,
+          })
+          return
+        }
+
+        let consumer = await transport.consume({
+          producerId: producer.id,
+          rtpCapabilities,
+          paused: false,
+          appData: { socketId: socket.id, toSocketId, mediaTag },
+        })
+
+        consumer.on('transportclose', async () => {
+          console.log(`consumer's transport closed`, consumer.id)
+          await closeConsumer(consumer)
+        })
+
+        consumer.on('producerclose', async () => {
+          console.log(`consumer's producer closed`, consumer.id)
+          await closeConsumer(consumer)
+        })
+
+        consumers.set(consumer.id, consumer)
+
+        ack({
+          producerId: producer.id,
+          id: consumer.id,
+          kind: consumer.kind,
+          rtpParameters: consumer.rtpParameters,
+          type: consumer.type,
+          producerPaused: consumer.producerPaused,
+        })
+      }
+    )
+
     socket.on('join', (ack) => {
       socket.join('room')
       ack({
@@ -251,6 +323,20 @@ async function closeProducer(producer) {
   try {
     await producer.close()
     producers.delete(producer.id)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function closeConsumer(consumer) {
+  console.log('closing consumer', {
+    consumerId: consumer.id,
+    appData: consumer.appData,
+  })
+
+  try {
+    await consumer.close()
+    consumers.delete(consumer.id)
   } catch (error) {
     console.error(error)
   }

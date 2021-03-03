@@ -234,6 +234,56 @@ function App() {
     [recvTransports]
   )
 
+  const subscribeToRemoteTrack = useCallback(
+    async (toSocketId, mediaTag) => {
+      if (!client || !isConnected || !device || !deviceLoaded) {
+        return
+      }
+
+      let recvTransport = await createRecvTransport(toSocketId)
+
+      const consumerParameters = await new Promise((resolve, reject) => {
+        client.emit(
+          'recv-track',
+          {
+            toSocketId,
+            mediaTag,
+            rtpCapabilities: device.rtpCapabilities,
+          },
+          (payload) => {
+            if ('error' in payload) {
+              return reject(payload.error)
+            } else {
+              return resolve(payload)
+            }
+          }
+        )
+      })
+      console.log('consumer parameters', { consumerParameters })
+
+      const consumer = await recvTransport.consume({
+        ...consumerParameters,
+        appData: { toSocketId, mediaTag },
+      })
+
+      setConsumers((consumers) => consumers.concat(consumer))
+    },
+    [createRecvTransport, client, isConnected, device, deviceLoaded]
+  )
+
+  const subscribeToRemoteVideoTrack = useCallback(
+    async (toSocketId) => {
+      await subscribeToRemoteTrack(toSocketId, 'cam-video')
+    },
+    [subscribeToRemoteTrack]
+  )
+
+  const removeClosedConsumers = useCallback(() => {
+    setConsumers((consumers) =>
+      consumers.filter((consumer) => !consumer.closed)
+    )
+  }, [])
+
   useEffect(() => {
     if (!client) {
       return
@@ -268,7 +318,7 @@ function App() {
           .filter((peerSocketId) => peerSocketId !== socketId)
           .concat(socketId)
       )
-      await createRecvTransport(socketId)
+      await subscribeToRemoteVideoTrack(socketId)
     }
 
     const onPeerLeftRoom = ({ socketId }) => {
@@ -277,6 +327,7 @@ function App() {
         onlinePeers.filter((peerSocketId) => peerSocketId !== socketId)
       )
       closeRecvTransport(socketId)
+      removeClosedConsumers()
     }
 
     client.on('connect', onConnect)
@@ -292,7 +343,13 @@ function App() {
       client.off('peer-joined', onPeerJoinedRoom)
       client.off('peer-left', onPeerLeftRoom)
     }
-  }, [client, device, createRecvTransport, closeRecvTransport])
+  }, [
+    client,
+    device,
+    subscribeToRemoteVideoTrack,
+    closeRecvTransport,
+    removeClosedConsumers,
+  ])
 
   const onJoinRoomButtonClick = () => {
     if (client) {
@@ -301,7 +358,7 @@ function App() {
         setHasJoinedRoom(true)
         setOnlinePeers(onlinePeers)
         onlinePeers.forEach(async (toSocketId) => {
-          await createRecvTransport(toSocketId)
+          await subscribeToRemoteVideoTrack(toSocketId)
         })
       })
     }
@@ -319,12 +376,13 @@ function App() {
     if (client) {
       client.emit('leave', async () => {
         await closeAllRecvTransports()
+        await removeClosedConsumers()
         setHasJoinedRoom(false)
         setOnlinePeers([])
         setRecvTransports({})
       })
     }
-  }, [client, onlinePeers, recvTransports])
+  }, [client, onlinePeers, recvTransports, removeClosedConsumers])
 
   return (
     <IonApp>
