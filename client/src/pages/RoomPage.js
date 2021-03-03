@@ -27,7 +27,7 @@ function RoomPage({ localMediaStream, onLeftRoomButtonClick }) {
           <RemoteVideoCard remoteStream={localMediaStream} title='peer#1' />
           <RemoteVideoCard remoteStream={localMediaStream} title='peer#2' />
           <RemoteVideoCard remoteStream={localMediaStream} title='peer#3' />
-          <RemoteVideoCard remoteStream={localMediaStream} title='peer#4' />
+          <RemoteVideoCard title='peer#4' />
         </div>
       </IonContent>
       <IonFooter>

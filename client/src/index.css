@@ -36,3 +36,8 @@ code {
 .remoteVideo {
   max-width: 320px;
 }
+
+.remoteVideoPlaceholder {
+  width: 320px;
+  height: 240px;
+}

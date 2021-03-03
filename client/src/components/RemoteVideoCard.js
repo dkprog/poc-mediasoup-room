@@ -3,6 +3,7 @@ import {
   IonCardHeader,
   IonCardContent,
   IonCardTitle,
+  IonSpinner,
 } from '@ionic/react'
 import { useEffect, useRef } from 'react'
 
@@ -15,10 +16,6 @@ function RemoteVideoCard({ remoteStream, title }) {
     }
   }, [videoEl, remoteStream])
 
-  if (!remoteStream) {
-    return null
-  }
-
   return (
     <IonCard>
       {title && (
@@ -27,7 +24,13 @@ function RemoteVideoCard({ remoteStream, title }) {
         </IonCardHeader>
       )}
       <IonCardContent>
-        <video playsInline autoPlay ref={videoEl} className='remoteVideo' />
+        {remoteStream ? (
+          <video playsInline autoPlay ref={videoEl} className='remoteVideo' />
+        ) : (
+          <div className='remoteVideoPlaceholder container'>
+            <IonSpinner />
+          </div>
+        )}
       </IonCardContent>
     </IonCard>
   )
