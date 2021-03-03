@@ -34,6 +34,7 @@ function App() {
   const [onlinePeers, setOnlinePeers] = useState([])
   const [recvTransports, setRecvTransports] = useState({}) // { [socketId] : recvTransport }
   const [consumers, setConsumers] = useState([])
+  const [remoteStreams, setRemoteStreams] = useState({})
 
   useEffect(() => {
     async function startCamera() {
@@ -249,6 +250,7 @@ function App() {
             toSocketId,
             mediaTag,
             rtpCapabilities: device.rtpCapabilities,
+            transportId: recvTransport.id,
           },
           (payload) => {
             if ('error' in payload) {
@@ -351,6 +353,17 @@ function App() {
     removeClosedConsumers,
   ])
 
+  useEffect(() => {
+    const remoteStreams = {}
+
+    consumers.forEach((consumer) => {
+      const { toSocketId } = consumer.appData
+      remoteStreams[toSocketId] = new MediaStream([consumer.track.clone()])
+    })
+
+    setRemoteStreams(remoteStreams)
+  }, [consumers])
+
   const onJoinRoomButtonClick = () => {
     if (client) {
       client.emit('join', ({ onlinePeers }) => {
@@ -391,6 +404,7 @@ function App() {
           localMediaStream={localMediaStream}
           onLeftRoomButtonClick={onLeftRoomButtonClick}
           onlinePeers={onlinePeers}
+          remoteStreams={remoteStreams}
         />
       ) : (
         <HomePage

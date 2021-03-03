@@ -175,12 +175,13 @@ function startSignalingServer() {
 
     socket.on(
       'recv-track',
-      async ({ toSocketId, mediaTag, rtpCapabilities }, ack) => {
+      async ({ toSocketId, mediaTag, rtpCapabilities, transportId }, ack) => {
         console.log('recv-track', {
           socketId: socket.id,
           toSocketId,
           mediaTag,
           rtpCapabilities,
+          transportId,
         })
 
         const producer = Array.from(producers.values()).find(
@@ -202,15 +203,11 @@ function startSignalingServer() {
           return
         }
 
-        let transport = Array.from(transports.values()).find(
-          (t) =>
-            t.appData.socketId === socket.id &&
-            t.appData.clientDirection === 'recv'
-        )
+        let transport = transports.get(transportId)
 
         if (!transport) {
           ack({
-            error: `server-side recv transport for ${socket.id} not found`,
+            error: `server-side recv transport #${transportId} not found`,
           })
           return
         }
