@@ -31,7 +31,7 @@ function App() {
   const [client, setClient] = useState(null)
   const [sendTransport, setSendTransport] = useState(null)
   const [, /*cameraVideoProducer*/ setCameraVideoProducer] = useState(null)
-  const [, /*onlinePeers*/ setOnlinePeers] = useState([])
+  const [onlinePeers, setOnlinePeers] = useState([])
 
   useEffect(() => {
     async function startCamera() {
@@ -285,6 +285,7 @@ function App() {
         <RoomPage
           localMediaStream={localMediaStream}
           onLeftRoomButtonClick={onLeftRoomButtonClick}
+          onlinePeers={onlinePeers}
         />
       ) : (
         <HomePage

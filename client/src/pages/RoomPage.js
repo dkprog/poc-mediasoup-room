@@ -11,7 +11,7 @@ import { exit } from 'ionicons/icons'
 import { useEffect, useRef } from 'react'
 import RemoteVideoCard from '../components/RemoteVideoCard'
 
-function RoomPage({ localMediaStream, onLeftRoomButtonClick }) {
+function RoomPage({ localMediaStream, onLeftRoomButtonClick, onlinePeers }) {
   const localVideoEl = useRef(null)
 
   useEffect(() => {
@@ -20,15 +20,14 @@ function RoomPage({ localMediaStream, onLeftRoomButtonClick }) {
     }
   }, [localVideoEl, localMediaStream])
 
+  const remoteVideoCards = onlinePeers.map((socketId) => (
+    <RemoteVideoCard title={`peer#${socketId}`} key={socketId} />
+  ))
+
   return (
     <IonPage>
       <IonContent>
-        <div className='container containerRow'>
-          <RemoteVideoCard remoteStream={localMediaStream} title='peer#1' />
-          <RemoteVideoCard remoteStream={localMediaStream} title='peer#2' />
-          <RemoteVideoCard remoteStream={localMediaStream} title='peer#3' />
-          <RemoteVideoCard title='peer#4' />
-        </div>
+        <div className='container containerRow'>{remoteVideoCards}</div>
       </IonContent>
       <IonFooter>
         <video playsInline autoPlay ref={localVideoEl} className='localVideo' />
