@@ -69,16 +69,19 @@ function startSignalingServer() {
       await closePeer(socket.id)
     })
 
-    socket.on('create-transport', async ({ direction }, ack) => {
-      console.log('create-transport', {
-        socketId: socket.id,
-        direction,
-      })
+    socket.on('create-transport', async ({ direction, toSocketId }, ack) => {
       const transport = await createWebRtcTransport({
         socketId: socket.id,
         direction,
+        toSocketId,
       })
       transports.set(transport.id, transport)
+      console.log('create-transport', {
+        socketId: socket.id,
+        direction,
+        toSocketId,
+        transportId: transport.id,
+      })
 
       const { id, iceParameters, iceCandidates, dtlsParameters } = transport
       ack({
@@ -180,22 +183,23 @@ function startSignalingServer() {
       socket.to('room').emit('peer-joined', { socketId: socket.id })
     })
 
-    socket.on('leave', (ack) => {
+    socket.on('leave', async (ack) => {
       socket.leave('room')
       ack()
       io.to('room').emit('peer-left', { socketId: socket.id })
+      await closeRecvTransportsBySocketId(socket.id)
     })
   })
 }
 
-async function createWebRtcTransport({ socketId, direction }) {
+async function createWebRtcTransport({ socketId, direction, toSocketId }) {
   const transport = await router.createWebRtcTransport({
     listenIps: LISTEN_IPS,
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
     initialAvailableOutgoingBitrate: 800000,
-    appData: { socketId, clientDirection: direction },
+    appData: { socketId, clientDirection: direction, toSocketId },
   })
 
   return transport
@@ -204,7 +208,22 @@ async function createWebRtcTransport({ socketId, direction }) {
 async function closePeer(socketId) {
   console.log('closing peer', { socketId })
   for (const [, transport] of transports) {
-    if (transport.appData.socketId === socketId) {
+    if (
+      transport.appData.socketId === socketId ||
+      transport.appData.toSocketId === socketId
+    ) {
+      await closeTransport(transport)
+    }
+  }
+}
+
+async function closeRecvTransportsBySocketId(socketId) {
+  for (const [, transport] of transports) {
+    if (
+      transport.appData.clientDirection === 'recv' &&
+      (transport.appData.socketId === socketId ||
+        transport.appData.toSocketId === socketId)
+    ) {
       await closeTransport(transport)
     }
   }

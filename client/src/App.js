@@ -32,6 +32,8 @@ function App() {
   const [sendTransport, setSendTransport] = useState(null)
   const [, /*cameraVideoProducer*/ setCameraVideoProducer] = useState(null)
   const [onlinePeers, setOnlinePeers] = useState([])
+  const [recvTransports, setRecvTransports] = useState({}) // { [socketId] : recvTransport }
+  const [consumers, setConsumers] = useState([])
 
   useEffect(() => {
     async function startCamera() {
@@ -77,14 +79,14 @@ function App() {
   }, [device])
 
   const createTransport = useCallback(
-    async (direction) => {
+    async (direction, toSocketId) => {
       if (!client || !device || !deviceLoaded || !isConnected) {
         return null
       }
       console.log(`create ${direction} transport`)
 
       let { transportOptions } = await new Promise((resolve) => {
-        client.emit('create-transport', { direction }, (payload) =>
+        client.emit('create-transport', { direction, toSocketId }, (payload) =>
           resolve(payload)
         )
       })
@@ -202,6 +204,36 @@ function App() {
     createCameraVideoProducer()
   }, [localMediaStream, sendTransport])
 
+  const createRecvTransport = useCallback(
+    async (toSocketId) => {
+      if (toSocketId in recvTransports) {
+        return recvTransports[toSocketId]
+      }
+
+      const recvTransport = await createTransport('recv', toSocketId)
+      setRecvTransports((prevRecvTransports) => ({
+        ...prevRecvTransports,
+        [toSocketId]: recvTransport,
+      }))
+      return recvTransport
+    },
+    [recvTransports, createTransport]
+  )
+
+  const closeRecvTransport = useCallback(
+    async (toSocketId) => {
+      if (toSocketId in recvTransports) {
+        await recvTransports[toSocketId].close()
+        setRecvTransports((prevRecvTransports) => {
+          const newRecvTransports = { ...prevRecvTransports }
+          delete newRecvTransports[toSocketId]
+          return newRecvTransports
+        })
+      }
+    },
+    [recvTransports]
+  )
+
   useEffect(() => {
     if (!client) {
       return
@@ -229,13 +261,14 @@ function App() {
       }
     }
 
-    const onPeerJoinedRoom = ({ socketId }) => {
+    const onPeerJoinedRoom = async ({ socketId }) => {
       console.log(`peer joined room`, { socketId })
       setOnlinePeers((onlinePeers) =>
         onlinePeers
           .filter((peerSocketId) => peerSocketId !== socketId)
           .concat(socketId)
       )
+      await createRecvTransport(socketId)
     }
 
     const onPeerLeftRoom = ({ socketId }) => {
@@ -243,6 +276,7 @@ function App() {
       setOnlinePeers((onlinePeers) =>
         onlinePeers.filter((peerSocketId) => peerSocketId !== socketId)
       )
+      closeRecvTransport(socketId)
     }
 
     client.on('connect', onConnect)
@@ -258,7 +292,7 @@ function App() {
       client.off('peer-joined', onPeerJoinedRoom)
       client.off('peer-left', onPeerLeftRoom)
     }
-  }, [client, device])
+  }, [client, device, createRecvTransport, closeRecvTransport])
 
   const onJoinRoomButtonClick = () => {
     if (client) {
@@ -266,18 +300,31 @@ function App() {
         console.log('joined', { onlinePeers })
         setHasJoinedRoom(true)
         setOnlinePeers(onlinePeers)
+        onlinePeers.forEach(async (toSocketId) => {
+          await createRecvTransport(toSocketId)
+        })
       })
     }
   }
 
-  const onLeftRoomButtonClick = () => {
-    if (client) {
-      client.emit('leave', () => {
-        setHasJoinedRoom(false)
-        setOnlinePeers([])
+  const onLeftRoomButtonClick = useCallback(() => {
+    const closeAllRecvTransports = async () => {
+      onlinePeers.forEach(async (toSocketId) => {
+        if (toSocketId in recvTransports) {
+          await recvTransports[toSocketId].close()
+        }
       })
     }
-  }
+
+    if (client) {
+      client.emit('leave', async () => {
+        await closeAllRecvTransports()
+        setHasJoinedRoom(false)
+        setOnlinePeers([])
+        setRecvTransports({})
+      })
+    }
+  }, [client, onlinePeers, recvTransports])
 
   return (
     <IonApp>
