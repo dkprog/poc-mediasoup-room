@@ -1,6 +1,6 @@
 import { IonApp } from '@ionic/react'
 import { io } from 'socket.io-client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import * as mediasoup from 'mediasoup-client'
 
 import '@ionic/react/css/core.css'
@@ -17,12 +17,20 @@ import '@ionic/react/css/display.css'
 import HomePage from './pages/HomePage'
 import RoomPage from './pages/RoomPage'
 
+const CAM_VIDEO_SIMULCAST_ENCODINGS = [
+  { maxBitrate: 96000, scaleResolutionDownBy: 4 },
+  { maxBitrate: 680000, scaleResolutionDownBy: 1 },
+]
+
 function App() {
   const [isConnected, setIsConnected] = useState(false)
   const [hasJoinedRoom] = useState(false)
   const [localMediaStream, setLocalMediaStream] = useState(null)
   const [device, setDevice] = useState(null)
+  const [deviceLoaded, setDeviceLoaded] = useState(false)
   const [client, setClient] = useState(null)
+  const [sendTransport, setSendTransport] = useState(null)
+  const [, /*cameraVideoProducer*/ setCameraVideoProducer] = useState(null)
 
   useEffect(() => {
     async function startCamera() {
@@ -67,6 +75,134 @@ function App() {
     setClient(client)
   }, [device])
 
+  const createTransport = useCallback(
+    async (direction) => {
+      if (!client || !device || !deviceLoaded || !isConnected) {
+        return null
+      }
+      console.log(`create ${direction} transport`)
+
+      let { transportOptions } = await new Promise((resolve) => {
+        client.emit('create-transport', { direction }, (payload) =>
+          resolve(payload)
+        )
+      })
+
+      console.log('received transport options', transportOptions)
+
+      let transport
+      if (direction === 'recv') {
+        transport = await device.createRecvTransport(transportOptions)
+      } else if (direction === 'send') {
+        transport = await device.createSendTransport(transportOptions)
+      } else {
+        throw new Error(`bad transport 'direction': ${direction}`)
+      }
+
+      transport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+        console.log('transport connect event', { direction })
+
+        let { error } = await new Promise(function (resolve) {
+          client.emit(
+            'connect-transport',
+            {
+              transportId: transportOptions.id,
+              dtlsParameters,
+            },
+            (payload) => {
+              resolve(payload)
+            }
+          )
+        })
+
+        if (error) {
+          console.error('error connecting transport', { direction, error })
+          errback()
+        } else {
+          callback()
+        }
+      })
+
+      if (direction === 'send') {
+        transport.on(
+          'produce',
+          async ({ kind, rtpParameters, appData }, callback, errback) => {
+            console.log('transport produce event', {
+              kind,
+              rtpParameters,
+              mediaTag: appData.mediaTag,
+            })
+
+            let { error, id } = await new Promise(function (resolve) {
+              client.emit(
+                'send-track',
+                {
+                  transportId: transportOptions.id,
+                  kind,
+                  rtpParameters,
+                  paused: false, // TODO: play with it
+                  appData,
+                },
+                (payload) => {
+                  resolve(payload)
+                }
+              )
+            })
+            if (error) {
+              console.error('error setting up server-side producer', { error })
+              errback()
+            } else {
+              callback({ id })
+            }
+          }
+        )
+      }
+
+      transport.on('connectionstatechange', (state) => {
+        console.log(`transport ${transport.id} connectionstatechange ${state}`)
+        if (
+          state === 'closed' ||
+          state === 'failed' ||
+          state === 'disconnected'
+        ) {
+          // TODO: reconnect socket-io
+        }
+      })
+
+      return transport
+    },
+    [client, device, deviceLoaded, isConnected]
+  )
+
+  useEffect(() => {
+    const createSendTransport = async () => {
+      const sendTransport = await createTransport('send')
+      if (sendTransport) {
+        setSendTransport(sendTransport)
+      }
+    }
+    createSendTransport()
+  }, [createTransport])
+
+  useEffect(() => {
+    const createCameraVideoProducer = async () => {
+      if (!localMediaStream || !sendTransport) {
+        return
+      }
+
+      const videoProducer = await sendTransport.produce({
+        track: localMediaStream.getVideoTracks()[0],
+        encoding: CAM_VIDEO_SIMULCAST_ENCODINGS,
+        appData: { mediaTag: 'cam-video' },
+      })
+
+      console.log(videoProducer)
+
+      setCameraVideoProducer(videoProducer)
+    }
+    createCameraVideoProducer()
+  }, [localMediaStream, sendTransport])
+
   useEffect(() => {
     if (!client) {
       return
@@ -86,6 +222,7 @@ function App() {
       console.log('received a welcome', { routerRtpCapabilities })
       if (!device.loaded) {
         await device.load({ routerRtpCapabilities })
+        setDeviceLoaded(device.loaded)
       }
       if (!device.canProduce('video')) {
         throw new Error("device can't produce video!")
