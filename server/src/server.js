@@ -39,6 +39,10 @@ function startSignalingServer() {
   io.on('connect', (socket) => {
     console.log('client connect', { socketId: socket.id })
 
+    socket.emit('welcome', {
+      routerRtpCapabilities: router.rtpCapabilities,
+    })
+
     socket.on('disconnect', () => {
       console.log('client disconnect', { socketId: socket.id })
     })
