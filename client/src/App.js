@@ -24,7 +24,7 @@ const CAM_VIDEO_SIMULCAST_ENCODINGS = [
 
 function App() {
   const [isConnected, setIsConnected] = useState(false)
-  const [hasJoinedRoom] = useState(false)
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false)
   const [localMediaStream, setLocalMediaStream] = useState(null)
   const [device, setDevice] = useState(null)
   const [deviceLoaded, setDeviceLoaded] = useState(false)
@@ -196,8 +196,6 @@ function App() {
         appData: { mediaTag: 'cam-video' },
       })
 
-      console.log(videoProducer)
-
       setCameraVideoProducer(videoProducer)
     }
     createCameraVideoProducer()
@@ -216,6 +214,7 @@ function App() {
     const onDisconnect = () => {
       console.log('disconnected')
       setIsConnected(false)
+      setHasJoinedRoom(false)
     }
 
     const onWelcome = async ({ routerRtpCapabilities }) => {
@@ -229,23 +228,57 @@ function App() {
       }
     }
 
+    const onPeerJoinedRoom = ({ socketId }) => {
+      console.log(`peer joined room`, { socketId })
+    }
+
+    const onPeerLeftRoom = ({ socketId }) => {
+      console.log(`peer left room`, { socketId })
+    }
+
     client.on('connect', onConnect)
     client.on('disconnect', onDisconnect)
     client.on('welcome', onWelcome)
+    client.on('peer-joined', onPeerJoinedRoom)
+    client.on('peer-left', onPeerLeftRoom)
 
     return () => {
       client.off('connect', onConnect)
       client.off('disconnect', onDisconnect)
       client.off('welcome', onWelcome)
+      client.off('peer-joined', onPeerJoinedRoom)
+      client.off('peer-left', onPeerLeftRoom)
     }
   }, [client, device])
+
+  const onJoinRoomButtonClick = () => {
+    if (client) {
+      client.emit('join', () => {
+        setHasJoinedRoom(true)
+      })
+    }
+  }
+
+  const onLeftRoomButtonClick = () => {
+    if (client) {
+      client.emit('leave', () => {
+        setHasJoinedRoom(false)
+      })
+    }
+  }
 
   return (
     <IonApp>
       {hasJoinedRoom ? (
-        <RoomPage localMediaStream={localMediaStream} />
+        <RoomPage
+          localMediaStream={localMediaStream}
+          onLeftRoomButtonClick={onLeftRoomButtonClick}
+        />
       ) : (
-        <HomePage isConnected={isConnected} />
+        <HomePage
+          isConnected={isConnected}
+          onJoinRoomButtonClick={onJoinRoomButtonClick}
+        />
       )}
     </IonApp>
   )

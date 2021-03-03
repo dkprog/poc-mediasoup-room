@@ -9,7 +9,7 @@ dotenv.config()
 
 const transports = new Map(),
   producers = new Map(),
-  consumers = []
+  consumers = new Map()
 
 let app, httpServer, io, worker, router
 
@@ -163,6 +163,18 @@ function startSignalingServer() {
         ack({ id: producer.id })
       }
     )
+
+    socket.on('join', (ack) => {
+      socket.join('room')
+      ack()
+      socket.to('room').emit('peer-joined', { socketId: socket.id })
+    })
+
+    socket.on('leave', (ack) => {
+      socket.leave('room')
+      ack()
+      io.to('room').emit('peer-left', { socketId: socket.id })
+    })
   })
 }
 

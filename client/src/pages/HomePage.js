@@ -7,13 +7,13 @@ import {
 } from '@ionic/react'
 import { videocam } from 'ionicons/icons'
 
-function HomePage({ isConnected }) {
+function HomePage({ isConnected, onJoinRoomButtonClick }) {
   return (
     <IonPage>
       <IonContent>
         <div className='container'>
           {isConnected ? (
-            <IonButton>
+            <IonButton onClick={onJoinRoomButtonClick}>
               <IonIcon icon={videocam} /> &nbsp; Join room
             </IonButton>
           ) : (

@@ -11,7 +11,7 @@ import { exit } from 'ionicons/icons'
 import { useEffect, useRef } from 'react'
 import RemoteVideoCard from '../components/RemoteVideoCard'
 
-function RoomPage({ localMediaStream }) {
+function RoomPage({ localMediaStream, onLeftRoomButtonClick }) {
   const localVideoEl = useRef(null)
 
   useEffect(() => {
@@ -35,7 +35,7 @@ function RoomPage({ localMediaStream }) {
         <IonToolbar>
           <IonButtons slot='start'></IonButtons>
           <IonButtons slot='end'>
-            <IonButton color='danger'>
+            <IonButton color='danger' onClick={onLeftRoomButtonClick}>
               <IonIcon icon={exit} />
             </IonButton>
           </IonButtons>
