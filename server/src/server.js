@@ -3,7 +3,7 @@ import dotenv from 'dotenv-defaults'
 import socketIO from 'socket.io'
 import http from 'http'
 import * as mediasoup from 'mediasoup'
-import { LISTEN_IPS, MEDIA_CODECS, WORKER_SETTINGS } from './constants'
+import { MEDIA_CODECS, WORKER_SETTINGS } from './constants'
 
 dotenv.config()
 
@@ -263,7 +263,12 @@ function startSignalingServer() {
 
 async function createWebRtcTransport({ socketId, direction, toSocketId }) {
   const transport = await router.createWebRtcTransport({
-    listenIps: LISTEN_IPS,
+    listenIps: [
+      {
+        ip: process.env.LISTEN_IP,
+        announcedIp: process.env.ANNOUNCED_IP || null,
+      },
+    ],
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,

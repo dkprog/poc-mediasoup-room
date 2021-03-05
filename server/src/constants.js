@@ -53,5 +53,3 @@ export const MEDIA_CODECS = [
     },
   },
 ]
-
-export const LISTEN_IPS = [{ ip: '127.0.0.1', announcedIp: null }]
