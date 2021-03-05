@@ -26,6 +26,7 @@ function App() {
   const [isConnected, setIsConnected] = useState(false)
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false)
   const [localMediaStream, setLocalMediaStream] = useState(null)
+  const [cameraDeviceId, setCameraDeviceId] = useState()
   const [device, setDevice] = useState(null)
   const [deviceLoaded, setDeviceLoaded] = useState(false)
   const [client, setClient] = useState(null)
@@ -37,11 +38,16 @@ function App() {
   const [remoteStreams, setRemoteStreams] = useState({})
 
   useEffect(() => {
+    if (!cameraDeviceId) {
+      return
+    }
     async function startCamera() {
       let localStream
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: {
+            deviceId: cameraDeviceId,
+          },
           audio: false,
         })
         setLocalMediaStream(localStream)
@@ -51,7 +57,7 @@ function App() {
     }
 
     startCamera()
-  }, [])
+  }, [cameraDeviceId])
 
   useEffect(() => {
     try {
@@ -397,6 +403,10 @@ function App() {
     }
   }, [client, onlinePeers, recvTransports, removeClosedConsumers])
 
+  const onSubmitSelectedDeviceId = (deviceId) => {
+    setCameraDeviceId(deviceId)
+  }
+
   return (
     <IonApp>
       {hasJoinedRoom ? (
@@ -410,6 +420,8 @@ function App() {
         <HomePage
           isConnected={isConnected}
           onJoinRoomButtonClick={onJoinRoomButtonClick}
+          onSubmitSelectedDeviceId={onSubmitSelectedDeviceId}
+          hasLocalMediaStream={!!localMediaStream}
         />
       )}
     </IonApp>

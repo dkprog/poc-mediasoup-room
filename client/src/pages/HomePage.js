@@ -6,13 +6,23 @@ import {
   IonSpinner,
 } from '@ionic/react'
 import { videocam } from 'ionicons/icons'
+import CameraSelectorCard from '../components/CameraSelectorCard'
 
-function HomePage({ isConnected, onJoinRoomButtonClick }) {
+function HomePage({
+  isConnected,
+  hasLocalMediaStream,
+  onSubmitSelectedDeviceId,
+  onJoinRoomButtonClick,
+}) {
   return (
     <IonPage>
       <IonContent>
         <div className='container'>
-          {isConnected ? (
+          {!hasLocalMediaStream ? (
+            <CameraSelectorCard
+              onSubmitSelectedDeviceId={onSubmitSelectedDeviceId}
+            />
+          ) : isConnected ? (
             <IonButton onClick={onJoinRoomButtonClick}>
               <IonIcon icon={videocam} /> &nbsp; Join room
             </IonButton>
