@@ -309,19 +309,17 @@ function App() {
       setHasJoinedRoom(false)
     }
 
-    const onWelcome = async ({ routerRtpCapabilities }) => {
-      console.log('received a welcome', { routerRtpCapabilities })
+    const onPeerJoinedRoom = async ({ socketId, rtpCapabilities }) => {
+      console.log(`peer joined room`, { socketId, rtpCapabilities })
+
       if (!device.loaded) {
-        await device.load({ routerRtpCapabilities })
+        await device.load({ rtpCapabilities })
         setDeviceLoaded(device.loaded)
       }
       if (!device.canProduce('video')) {
         throw new Error("device can't produce video!")
       }
-    }
 
-    const onPeerJoinedRoom = async ({ socketId }) => {
-      console.log(`peer joined room`, { socketId })
       setOnlinePeers((onlinePeers) =>
         onlinePeers
           .filter((peerSocketId) => peerSocketId !== socketId)
@@ -341,14 +339,12 @@ function App() {
 
     client.on('connect', onConnect)
     client.on('disconnect', onDisconnect)
-    client.on('welcome', onWelcome)
     client.on('peer-joined', onPeerJoinedRoom)
     client.on('peer-left', onPeerLeftRoom)
 
     return () => {
       client.off('connect', onConnect)
       client.off('disconnect', onDisconnect)
-      client.off('welcome', onWelcome)
       client.off('peer-joined', onPeerJoinedRoom)
       client.off('peer-left', onPeerLeftRoom)
     }
