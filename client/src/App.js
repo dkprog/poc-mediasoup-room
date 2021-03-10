@@ -93,9 +93,17 @@ function App() {
       }
       console.log(`create ${direction} transport`)
 
-      let { transportOptions } = await new Promise((resolve) => {
-        client.emit('create-transport', { direction, toSocketId }, (payload) =>
-          resolve(payload)
+      let { transportOptions } = await new Promise((resolve, reject) => {
+        client.emit(
+          'create-transport',
+          { direction, toSocketId },
+          (payload) => {
+            if ('error' in payload) {
+              reject(payload.error)
+            } else {
+              resolve(payload)
+            }
+          }
         )
       })
 
@@ -193,6 +201,7 @@ function App() {
       }
     }
     createSendTransport()
+    // TODO: close send transport when user leaves the room
   }, [createTransport])
 
   useEffect(() => {

@@ -54,12 +54,37 @@ function startSignalingServer() {
     })
 
     socket.on('create-transport', async ({ direction, toSocketId }, ack) => {
+      const roomName = getRoomName()
+      if (!roomName) {
+        return
+      }
+
       console.log('create-transport', {
         socketId: socket.id,
         direction,
         toSocketId,
+        roomName,
       })
-      // TODO: create transport
+
+      let response, transportOptions
+
+      try {
+        response = await axiosIntance.post(`/rooms/${roomName}/transports`, {
+          socketId: socket.id,
+          direction,
+          toSocketId,
+        })
+        transportOptions = response.data.transportOptions
+      } catch (error) {
+        console.error(
+          `Could not create transport for ${socket.id}:`,
+          error.message
+        )
+        ack({ error: `Could not create transport` })
+        return
+      }
+
+      ack({ transportOptions })
     })
 
     socket.on(
