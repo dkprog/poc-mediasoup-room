@@ -7,7 +7,8 @@ import { MEDIA_CODECS, WORKER_SETTINGS } from './constants'
 
 dotenv.config()
 
-const transports = new Map(),
+const peerRooms = new Map(),
+  transports = new Map(),
   producers = new Map(),
   consumers = new Map()
 
@@ -59,8 +60,9 @@ function startSignalingServer() {
     })
 
     socket.on('disconnecting', () => {
-      if (socket.rooms.has('room')) {
-        io.to('room').emit('peer-left', { socketId: socket.id })
+      const roomName = peerRooms.get(socket.id)
+      if (roomName && socket.rooms.has(roomName)) {
+        io.to(roomName).emit('peer-left', { socketId: socket.id })
       }
     })
 
@@ -242,20 +244,29 @@ function startSignalingServer() {
       }
     )
 
-    socket.on('join', (ack) => {
-      socket.join('room')
+    socket.on('join', ({ roomName }, ack) => {
+      if (!roomName) {
+        return
+      }
+      peerRooms.set(socket.id, roomName)
+      socket.join(roomName)
       ack({
         onlinePeers: Array.from(
-          io.of('/').adapter.rooms.get('room').values()
+          io.of('/').adapter.rooms.get(roomName).values()
         ).filter((socketId) => socketId !== socket.id),
       })
-      socket.to('room').emit('peer-joined', { socketId: socket.id })
+      socket.to(roomName).emit('peer-joined', { socketId: socket.id })
     })
 
     socket.on('leave', async (ack) => {
-      socket.leave('room')
+      const roomName = peerRooms.get(socket.id)
+      if (!roomName) {
+        return
+      }
+      socket.leave(roomName)
+      peerRooms.delete(socket.id)
       ack()
-      io.to('room').emit('peer-left', { socketId: socket.id })
+      io.to(roomName).emit('peer-left', { socketId: socket.id })
       await closeRecvTransportsBySocketId(socket.id)
     })
   })

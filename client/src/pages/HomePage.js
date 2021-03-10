@@ -1,18 +1,16 @@
 import {
   IonPage,
   IonContent,
-  IonButton,
-  IonIcon,
   IonSpinner,
 } from '@ionic/react'
-import { videocam } from 'ionicons/icons'
 import CameraSelectorCard from '../components/CameraSelectorCard'
+import RoomSelectorCard from '../components/RoomSelectorCard'
 
 function HomePage({
   isConnected,
   hasLocalMediaStream,
   onSubmitSelectedDeviceId,
-  onJoinRoomButtonClick,
+  onJoinRoom,
 }) {
   return (
     <IonPage>
@@ -23,9 +21,7 @@ function HomePage({
               onSubmitSelectedDeviceId={onSubmitSelectedDeviceId}
             />
           ) : isConnected ? (
-            <IonButton onClick={onJoinRoomButtonClick}>
-              <IonIcon icon={videocam} /> &nbsp; Join room
-            </IonButton>
+            <RoomSelectorCard onJoinRoom={onJoinRoom} />
           ) : (
             <IonSpinner />
           )}

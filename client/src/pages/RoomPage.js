@@ -6,12 +6,14 @@ import {
   IonButtons,
   IonButton,
   IonIcon,
+  IonTitle,
 } from '@ionic/react'
 import { exit } from 'ionicons/icons'
 import { useEffect, useRef } from 'react'
 import RemoteVideoCard from '../components/RemoteVideoCard'
 
 function RoomPage({
+  roomName,
   localMediaStream,
   onLeftRoomButtonClick,
   onlinePeers,
@@ -41,7 +43,9 @@ function RoomPage({
       <IonFooter>
         <video playsInline autoPlay ref={localVideoEl} className='localVideo' />
         <IonToolbar>
-          <IonButtons slot='start'></IonButtons>
+          <IonTitle style={{ textAlign: 'center' }}>
+            <strong>{roomName}</strong>
+          </IonTitle>
           <IonButtons slot='end'>
             <IonButton color='danger' onClick={onLeftRoomButtonClick}>
               <IonIcon icon={exit} />

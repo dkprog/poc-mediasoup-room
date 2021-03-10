@@ -36,6 +36,7 @@ function App() {
   const [recvTransports, setRecvTransports] = useState({}) // { [socketId] : recvTransport }
   const [consumers, setConsumers] = useState([])
   const [remoteStreams, setRemoteStreams] = useState({})
+  const [roomName, setRoomName] = useState()
 
   useEffect(() => {
     if (!cameraDeviceId) {
@@ -370,12 +371,13 @@ function App() {
     setRemoteStreams(remoteStreams)
   }, [consumers])
 
-  const onJoinRoomButtonClick = () => {
+  const onJoinRoom = (roomName) => {
     if (client) {
-      client.emit('join', ({ onlinePeers }) => {
-        console.log('joined', { onlinePeers })
+      client.emit('join', { roomName }, ({ onlinePeers }) => {
+        console.log('joined', { roomName, onlinePeers })
         setHasJoinedRoom(true)
         setOnlinePeers(onlinePeers)
+        setRoomName(roomName)
         onlinePeers.forEach(async (toSocketId) => {
           await subscribeToRemoteVideoTrack(toSocketId)
         })
@@ -399,6 +401,7 @@ function App() {
         setHasJoinedRoom(false)
         setOnlinePeers([])
         setRecvTransports({})
+        setRoomName(null)
       })
     }
   }, [client, onlinePeers, recvTransports, removeClosedConsumers])
@@ -411,6 +414,7 @@ function App() {
     <IonApp>
       {hasJoinedRoom ? (
         <RoomPage
+          roomName={roomName}
           localMediaStream={localMediaStream}
           onLeftRoomButtonClick={onLeftRoomButtonClick}
           onlinePeers={onlinePeers}
@@ -419,7 +423,7 @@ function App() {
       ) : (
         <HomePage
           isConnected={isConnected}
-          onJoinRoomButtonClick={onJoinRoomButtonClick}
+          onJoinRoom={onJoinRoom}
           onSubmitSelectedDeviceId={onSubmitSelectedDeviceId}
           hasLocalMediaStream={!!localMediaStream}
         />
