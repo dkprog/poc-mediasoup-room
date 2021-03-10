@@ -2,14 +2,20 @@ import express from 'express'
 import dotenv from 'dotenv-defaults'
 import socketIO from 'socket.io'
 import http from 'http'
+import axios from 'axios'
 
 dotenv.config()
 
-let app, httpServer, io
+let axiosIntance, app, httpServer, io
 
 main()
 
-async function main() {
+function main() {
+  axiosIntance = axios.create({
+    baseURL: process.env.API_BASE_URL,
+    timeout: 1000,
+  })
+
   startWebserver()
   startSignalingServer()
 }
@@ -34,8 +40,6 @@ function startSignalingServer() {
 
   io.on('connect', (socket) => {
     console.log('client connect', { socketId: socket.id })
-
-    // TODO: emit 'welcome'
 
     socket.on('disconnecting', () => {
       const roomName = getRoomName()
@@ -99,17 +103,28 @@ function startSignalingServer() {
       }
     )
 
-    socket.on('join', ({ roomName }, ack) => {
+    socket.on('join', async ({ roomName }, ack) => {
       if (!roomName) {
         return
       }
+
+      let response, routerRtpCapabilities
+
+      try {
+        response = await axiosIntance.put(`/rooms/${roomName}`)
+        routerRtpCapabilities = response.data.routerRtpCapabilities
+      } catch (error) {
+        console.error(error.message)
+        return
+      }
+
       console.log('join', { socketId: socket.id, roomName })
       socket.join(roomName)
-      // TODO: send router's rtpCapabilities
       ack({
         onlinePeers: Array.from(
           io.of('/').adapter.rooms.get(roomName).values()
         ).filter((socketId) => socketId !== socket.id),
+        routerRtpCapabilities,
       })
       socket.to(roomName).emit('peer-joined', { socketId: socket.id })
     })
@@ -120,7 +135,7 @@ function startSignalingServer() {
         return
       }
       console.log('leave', { socketId: socket.id, roomName })
-      
+
       socket.leave(roomName)
       ack()
       io.to(roomName).emit('peer-left', { socketId: socket.id })

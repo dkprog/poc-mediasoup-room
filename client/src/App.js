@@ -309,16 +309,8 @@ function App() {
       setHasJoinedRoom(false)
     }
 
-    const onPeerJoinedRoom = async ({ socketId, rtpCapabilities }) => {
-      console.log(`peer joined room`, { socketId, rtpCapabilities })
-
-      if (!device.loaded) {
-        await device.load({ rtpCapabilities })
-        setDeviceLoaded(device.loaded)
-      }
-      if (!device.canProduce('video')) {
-        throw new Error("device can't produce video!")
-      }
+    const onPeerJoinedRoom = async ({ socketId }) => {
+      console.log(`peer joined room`, { socketId })
 
       setOnlinePeers((onlinePeers) =>
         onlinePeers
@@ -369,15 +361,30 @@ function App() {
 
   const onJoinRoom = (roomName) => {
     if (client) {
-      client.emit('join', { roomName }, ({ onlinePeers }) => {
-        console.log('joined', { roomName, onlinePeers })
-        setHasJoinedRoom(true)
-        setOnlinePeers(onlinePeers)
-        setRoomName(roomName)
-        onlinePeers.forEach(async (toSocketId) => {
-          await subscribeToRemoteVideoTrack(toSocketId)
-        })
-      })
+      client.emit(
+        'join',
+        { roomName },
+        async ({ onlinePeers, routerRtpCapabilities }) => {
+          if (!device.loaded) {
+            await device.load({ routerRtpCapabilities })
+            setDeviceLoaded(device.loaded)
+          }
+          if (!device.canProduce('video')) {
+            throw new Error("device can't produce video!")
+          }
+          console.log('joined', {
+            roomName,
+            onlinePeers,
+            routerRtpCapabilities,
+          })
+          setHasJoinedRoom(true)
+          setOnlinePeers(onlinePeers)
+          setRoomName(roomName)
+          onlinePeers.forEach(async (toSocketId) => {
+            await subscribeToRemoteVideoTrack(toSocketId)
+          })
+        }
+      )
     }
   }
 
