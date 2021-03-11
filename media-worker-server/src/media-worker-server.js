@@ -4,6 +4,7 @@ import dotenv from 'dotenv-defaults'
 import http from 'http'
 import * as mediasoup from 'mediasoup'
 import { MEDIA_CODECS, WORKER_SETTINGS } from './constants'
+import logger from 'morgan'
 
 dotenv.config()
 
@@ -36,6 +37,7 @@ function startWebserver() {
 
   app.use(bodyParser.urlencoded({ extended: false }))
   app.use(bodyParser.json())
+  app.use(logger('dev'))
 
   app.put('/rooms/:roomName', (req, res) => {
     return res.json({ routerRtpCapabilities: router.rtpCapabilities })
