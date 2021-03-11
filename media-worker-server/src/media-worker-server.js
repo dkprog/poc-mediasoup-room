@@ -59,6 +59,50 @@ function startWebserver() {
   httpServer.listen(PORT, () => {
     console.log(`Listening HTTP in port ${PORT}`)
   })
+
+  app.delete('/rooms/:roomName/transports/:transportId', async (req, res) => {
+    const { socketId } = req.body
+    const { transportId } = req.params
+
+    const transport = transports.get(transportId)
+
+    if (!transport) {
+      return res.sendStatus(404)
+    } else if (transport.appData.socketId !== socketId) {
+      return res.sendStatus(403)
+    }
+
+    await transport.close()
+    transports.delete(transport.id)
+    return res.sendStatus(200)
+  })
+
+  app.put('/rooms/:roomName/transports/:transportId', async (req, res) => {
+    const { socketId, dtlsParameters } = req.body
+    const { transportId } = req.params
+
+    const transport = transports.get(transportId)
+
+    if (!transport) {
+      return res.sendStatus(404)
+    } else if (transport.appData.socketId !== socketId) {
+      return res.sendStatus(403)
+    }
+
+    try {
+      await transport.connect({ dtlsParameters })
+    } catch (error) {
+      console.error('error in connect-transport', {
+        socketId,
+        transportId,
+        dtlsParameters,
+        error,
+      })
+      return res.sendStatus(500)
+    }
+
+    return res.sendStatus(200)
+  })
 }
 
 async function createWebRtcTransport({ socketId, direction, toSocketId }) {

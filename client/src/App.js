@@ -88,7 +88,7 @@ function App() {
 
   const createTransport = useCallback(
     async (direction, toSocketId) => {
-      if (!client || !device || !deviceLoaded || !isConnected) {
+      if (!client || !device || !deviceLoaded || !isConnected || !roomName) {
         return null
       }
       console.log(`create ${direction} transport`)
@@ -190,7 +190,7 @@ function App() {
 
       return transport
     },
-    [client, device, deviceLoaded, isConnected]
+    [client, device, deviceLoaded, isConnected, roomName]
   )
 
   useEffect(() => {
@@ -201,8 +201,42 @@ function App() {
       }
     }
     createSendTransport()
-    // TODO: close send transport when user leaves the room
   }, [createTransport])
+
+  const closeTransport = useCallback(
+    async (transportId) => {
+      if (!client || !isConnected) {
+        return false
+      }
+
+      console.log('close transport', { transportId })
+
+      await new Promise((resolve, reject) => {
+        client.emit('close-transport', { transportId }, (payload) => {
+          if ('error' in payload) {
+            reject(payload.error)
+          } else {
+            resolve()
+          }
+        })
+      })
+
+      console.log('transport closed', { transportId })
+    },
+    [client, isConnected]
+  )
+
+  const closeSendTransport = useCallback(async () => {
+    if (!sendTransport) {
+      return
+    }
+
+    try {
+      await closeTransport(sendTransport.id)
+    } finally {
+      setSendTransport(null)
+    }
+  }, [closeTransport, sendTransport])
 
   useEffect(() => {
     const createCameraVideoProducer = async () => {
@@ -312,10 +346,11 @@ function App() {
       setIsConnected(true)
     }
 
-    const onDisconnect = () => {
+    const onDisconnect = async () => {
       console.log('disconnected')
       setIsConnected(false)
       setHasJoinedRoom(false)
+      await closeSendTransport()
     }
 
     const onPeerJoinedRoom = async ({ socketId }) => {
@@ -355,6 +390,7 @@ function App() {
     subscribeToRemoteVideoTrack,
     closeRecvTransport,
     removeClosedConsumers,
+    closeSendTransport,
   ])
 
   useEffect(() => {
@@ -397,7 +433,7 @@ function App() {
     }
   }
 
-  const onLeftRoomButtonClick = useCallback(() => {
+  const onLeftRoomButtonClick = useCallback(async () => {
     const closeAllRecvTransports = async () => {
       onlinePeers.forEach(async (toSocketId) => {
         if (toSocketId in recvTransports) {
@@ -407,6 +443,7 @@ function App() {
     }
 
     if (client) {
+      await closeSendTransport()
       client.emit('leave', async () => {
         await closeAllRecvTransports()
         await removeClosedConsumers()
@@ -416,7 +453,13 @@ function App() {
         setRoomName(null)
       })
     }
-  }, [client, onlinePeers, recvTransports, removeClosedConsumers])
+  }, [
+    client,
+    onlinePeers,
+    recvTransports,
+    removeClosedConsumers,
+    closeSendTransport,
+  ])
 
   const onSubmitSelectedDeviceId = (deviceId) => {
     setCameraDeviceId(deviceId)

@@ -90,12 +90,36 @@ function startSignalingServer() {
     socket.on(
       'connect-transport',
       async ({ transportId, dtlsParameters }, ack) => {
+        const roomName = getRoomName()
+        if (!roomName) {
+          return
+        }
+
         console.log('connect-transport', {
           socketId: socket.id,
           transportId,
           dtlsParameters,
+          roomName,
         })
-        // TODO: connect transport
+
+        try {
+          await axiosIntance.put(
+            `/rooms/${roomName}/transports/${transportId}`,
+            {
+              socketId: socket.id,
+              dtlsParameters,
+            }
+          )
+        } catch (error) {
+          console.error(
+            `Could not connect transport #${transportId} for ${socket.id}:`,
+            error.message
+          )
+          ack({ error: `Could not connect transport` })
+          return
+        }
+
+        ack({})
       }
     )
 
@@ -127,6 +151,35 @@ function startSignalingServer() {
         // TODO: create consumer in the transport
       }
     )
+
+    socket.on('close-transport', async ({ transportId }, ack) => {
+      const roomName = getRoomName()
+      if (!roomName) {
+        return
+      }
+
+      console.log('close-transport', {
+        socketId: socket.id,
+        transportId,
+        roomName,
+      })
+
+      try {
+        await axiosIntance.delete(
+          `/rooms/${roomName}/transports/${transportId}`,
+          { data: { socketId: socket.id } }
+        )
+      } catch (error) {
+        console.error(
+          `Could not delete transport #${transportId} for ${socket.id}:`,
+          error.message
+        )
+        ack({ error: `Could not delete transport` })
+        return
+      }
+
+      ack({})
+    })
 
     socket.on('join', async ({ roomName }, ack) => {
       if (!roomName) {
