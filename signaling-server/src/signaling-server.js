@@ -126,6 +126,10 @@ function startSignalingServer() {
     socket.on(
       'send-track',
       async ({ transportId, kind, rtpParameters, paused, appData }, ack) => {
+        const roomName = getRoomName()
+        if (!roomName) {
+          return
+        }
         console.log('send-track', {
           socketId: socket.id,
           transportId,
@@ -134,7 +138,30 @@ function startSignalingServer() {
           paused,
           appData,
         })
-        // TODO: create producer in the transport
+
+        let response, producerId
+        try {
+          response = await axiosIntance.post(
+            `/rooms/${roomName}/transports/${transportId}/producers`,
+            {
+              socketId: socket.id,
+              kind,
+              rtpParameters,
+              paused,
+              appData,
+            }
+          )
+          producerId = response.data.producerId
+        } catch (error) {
+          console.error(
+            `Could not send track to the transport #${transportId} for ${socket.id}:`,
+            error.message
+          )
+          ack({ error: `Could not send track` })
+          return
+        }
+
+        ack({ id: producerId })
       }
     )
 

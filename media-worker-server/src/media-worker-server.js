@@ -7,7 +7,8 @@ import { MEDIA_CODECS, WORKER_SETTINGS } from './constants'
 
 dotenv.config()
 
-const transports = new Map()
+const transports = new Map(),
+  producers = new Map()
 
 let app, httpServer, worker, router
 
@@ -103,6 +104,44 @@ function startWebserver() {
 
     return res.sendStatus(200)
   })
+
+  app.post(
+    '/rooms/:roomName/transports/:transportId/producers',
+    async (req, res) => {
+      const { socketId, kind, rtpParameters, paused, appData } = req.body
+      const { transportId } = req.params
+
+      const transport = transports.get(transportId)
+
+      if (!transport) {
+        return res.sendStatus(404)
+      } else if (transport.appData.socketId !== socketId) {
+        return res.sendStatus(403)
+      }
+
+      let producer = await transport.produce({
+        kind,
+        rtpParameters,
+        paused,
+        appData: { ...appData, socketId, transportId },
+      })
+
+      producer.on('transportclose', () => {
+        console.log("producer's transport closed", {
+          socketId,
+          producerId: producer.id,
+        })
+        closeProducer(producer)
+      })
+
+      if (producer.kind === 'audio') {
+        // TODO: observe audio producer
+      }
+
+      producers.set(producer.id, producer)
+      return res.json({ producerId: producer.id })
+    }
+  )
 }
 
 async function createWebRtcTransport({ socketId, direction, toSocketId }) {
@@ -121,4 +160,18 @@ async function createWebRtcTransport({ socketId, direction, toSocketId }) {
   })
 
   return transport
+}
+
+async function closeProducer(producer) {
+  console.log('closing producer', {
+    producerId: producer.id,
+    appData: producer.appData,
+  })
+
+  try {
+    await producer.close()
+    producers.delete(producer.id)
+  } catch (error) {
+    console.error(error)
+  }
 }
