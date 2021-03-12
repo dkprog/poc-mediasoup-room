@@ -9,7 +9,8 @@ import logger from 'morgan'
 dotenv.config()
 
 const transports = new Map(),
-  producers = new Map()
+  producers = new Map(),
+  consumers = new Map()
 
 let app, httpServer, worker, router
 
@@ -39,8 +40,12 @@ function startWebserver() {
   app.use(bodyParser.json())
   app.use(logger('dev'))
 
-  app.put('/rooms/:roomName', (req, res) => {
+  app.get('/rooms/:roomName', (req, res) => {
     return res.json({ routerRtpCapabilities: router.rtpCapabilities })
+  })
+
+  app.put('/rooms/:roomName', (req, res) => {
+    return res.sendStatus(200)
   })
 
   app.post('/rooms/:roomName/transports', async (req, res) => {
@@ -141,7 +146,70 @@ function startWebserver() {
       }
 
       producers.set(producer.id, producer)
+      console.log(producer)
       return res.json({ producerId: producer.id })
+    }
+  )
+
+  app.post(
+    `/rooms/:roomName/transports/:transportId/consumers`,
+    async (req, res) => {
+      const { socketId, toSocketId, mediaTag, rtpCapabilities } = req.body
+      const { transportId } = req.params
+      const producer = Array.from(producers.values()).find(
+        (p) =>
+          p.appData.mediaTag === mediaTag && p.appData.socketId === toSocketId
+      )
+
+      if (!producer) {
+        console.log(producers.values())
+        console.error(
+          `service-side producer for ${toSocketId}:${mediaTag} not found`
+        )
+        return res.sendStatus(400)
+      }
+
+      let transport = transports.get(transportId)
+
+      if (!transport) {
+        console.error(`service-side recv transport #${transportId} not found`)
+        return res.sendStatus(400)
+      }
+
+      if (!router.canConsume({ producerId: producer.id, rtpCapabilities })) {
+        console.error(`client cannot consume ${toSocketId}:${mediaTag}`)
+        return res.sendStatus(500)
+      }
+
+      let consumer = await transport.consume({
+        producerId: producer.id,
+        rtpCapabilities,
+        paused: false,
+        appData: { socketId, toSocketId },
+      })
+
+      consumer.on('transportclose', async () => {
+        console.log(`consumer's transport closed`, consumer.id)
+        // TODO:
+        // await closeConsumer(consumer)
+      })
+
+      consumer.on('producerclose', async () => {
+        console.log(`consumer's producer closed`, consumer.id)
+        // TODO:
+        // await closeConsumer(consumer)
+      })
+
+      consumers.set(consumer.id, consumer)
+
+      return res.json({
+        producerId: producer.id,
+        id: consumer.id,
+        kind: consumer.kind,
+        rtpParameters: consumer.rtpParameters,
+        type: consumer.type,
+        producerPaused: consumer.producerPaused,
+      })
     }
   )
 }

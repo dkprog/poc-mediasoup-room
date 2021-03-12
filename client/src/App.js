@@ -31,7 +31,7 @@ function App() {
   const [deviceLoaded, setDeviceLoaded] = useState(false)
   const [client, setClient] = useState(null)
   const [sendTransport, setSendTransport] = useState(null)
-  const [, /*cameraVideoProducer*/ setCameraVideoProducer] = useState(null)
+  const [cameraVideoProducer, setCameraVideoProducer] = useState(null)
   const [onlinePeers, setOnlinePeers] = useState([])
   const [recvTransports, setRecvTransports] = useState({}) // { [socketId] : recvTransport }
   const [consumers, setConsumers] = useState([])
@@ -61,6 +61,22 @@ function App() {
   }, [cameraDeviceId])
 
   useEffect(() => {
+    const client = io(process.env.REACT_APP_SIGNALING_SERVER_URL, {
+      transports: ['websocket'],
+    })
+
+    setClient(client)
+
+    return () => {
+      client.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!roomName) {
+      return
+    }
+
     try {
       const device = new mediasoup.Device()
       setDevice(device)
@@ -72,19 +88,36 @@ function App() {
         console.error(error)
       }
     }
-  }, [])
+
+    return () => {
+      setDevice(null)
+      setDeviceLoaded(false)
+    }
+  }, [roomName])
 
   useEffect(() => {
-    if (!device) {
+    if (!roomName || !client || !isConnected || !device || device.loaded) {
       return
     }
 
-    const client = io(process.env.REACT_APP_SIGNALING_SERVER_URL, {
-      transports: ['websocket'],
-    })
+    const emitWelcome = () => {
+      client.emit(
+        'welcome',
+        { roomName },
+        async ({ routerRtpCapabilities }) => {
+          await device.load({ routerRtpCapabilities })
 
-    setClient(client)
-  }, [device])
+          if (!device.canProduce('video')) {
+            throw new Error("device can't produce video!")
+          } else {
+            setDeviceLoaded(device.loaded)
+          }
+        }
+      )
+    }
+
+    emitWelcome()
+  }, [roomName, client, isConnected, device])
 
   const createTransport = useCallback(
     async (direction, toSocketId) => {
@@ -96,7 +129,7 @@ function App() {
       let { transportOptions } = await new Promise((resolve, reject) => {
         client.emit(
           'create-transport',
-          { direction, toSocketId },
+          { direction, toSocketId, roomName },
           (payload) => {
             if ('error' in payload) {
               reject(payload.error)
@@ -127,6 +160,7 @@ function App() {
             {
               transportId: transportOptions.id,
               dtlsParameters,
+              roomName,
             },
             (payload) => {
               resolve(payload)
@@ -161,6 +195,7 @@ function App() {
                   rtpParameters,
                   paused: false, // TODO: play with it
                   appData,
+                  roomName,
                 },
                 (payload) => {
                   resolve(payload)
@@ -204,15 +239,15 @@ function App() {
   }, [createTransport])
 
   const closeTransport = useCallback(
-    async (transportId) => {
+    async (transportId, roomName) => {
       if (!client || !isConnected) {
         return false
       }
 
-      console.log('close transport', { transportId })
+      console.log('close transport', { transportId, roomName })
 
       await new Promise((resolve, reject) => {
-        client.emit('close-transport', { transportId }, (payload) => {
+        client.emit('close-transport', { transportId, roomName }, (payload) => {
           if ('error' in payload) {
             reject(payload.error)
           } else {
@@ -227,16 +262,16 @@ function App() {
   )
 
   const closeSendTransport = useCallback(async () => {
-    if (!sendTransport) {
+    if (!sendTransport || !roomName) {
       return
     }
 
     try {
-      await closeTransport(sendTransport.id)
+      await closeTransport(sendTransport.id, roomName)
     } finally {
       setSendTransport(null)
     }
-  }, [closeTransport, sendTransport])
+  }, [closeTransport, sendTransport, roomName])
 
   useEffect(() => {
     const createCameraVideoProducer = async () => {
@@ -330,6 +365,24 @@ function App() {
     [subscribeToRemoteTrack]
   )
 
+  useEffect(() => {
+    if (!cameraVideoProducer || !roomName) {
+      return
+    }
+
+    client.emit('join', { roomName }, ({ onlinePeers }) => {
+      console.log('joined', {
+        roomName,
+        onlinePeers,
+      })
+      setHasJoinedRoom(true)
+      setOnlinePeers(onlinePeers)
+      onlinePeers.forEach(async (toSocketId) => {
+        await subscribeToRemoteVideoTrack(toSocketId)
+      })
+    })
+  }, [cameraVideoProducer, roomName, client, subscribeToRemoteVideoTrack])
+
   const removeClosedConsumers = useCallback(() => {
     setConsumers((consumers) =>
       consumers.filter((consumer) => !consumer.closed)
@@ -404,36 +457,11 @@ function App() {
     setRemoteStreams(remoteStreams)
   }, [consumers])
 
-  const onJoinRoom = (roomName) => {
-    if (client) {
-      client.emit(
-        'join',
-        { roomName },
-        async ({ onlinePeers, routerRtpCapabilities }) => {
-          if (!device.loaded) {
-            await device.load({ routerRtpCapabilities })
-            setDeviceLoaded(device.loaded)
-          }
-          if (!device.canProduce('video')) {
-            throw new Error("device can't produce video!")
-          }
-          console.log('joined', {
-            roomName,
-            onlinePeers,
-            routerRtpCapabilities,
-          })
-          setHasJoinedRoom(true)
-          setOnlinePeers(onlinePeers)
-          setRoomName(roomName)
-          onlinePeers.forEach(async (toSocketId) => {
-            await subscribeToRemoteVideoTrack(toSocketId)
-          })
-        }
-      )
-    }
+  const onSelectRoom = (roomName) => {
+    setRoomName(roomName)
   }
 
-  const onLeftRoomButtonClick = useCallback(async () => {
+  const onLeftRoomButtonClick = useCallback(() => {
     const closeAllRecvTransports = async () => {
       onlinePeers.forEach(async (toSocketId) => {
         if (toSocketId in recvTransports) {
@@ -443,14 +471,14 @@ function App() {
     }
 
     if (client) {
-      await closeSendTransport()
       client.emit('leave', async () => {
+        await closeSendTransport()
         await closeAllRecvTransports()
         await removeClosedConsumers()
         setHasJoinedRoom(false)
+        setRoomName(null)
         setOnlinePeers([])
         setRecvTransports({})
-        setRoomName(null)
       })
     }
   }, [
@@ -478,9 +506,10 @@ function App() {
       ) : (
         <HomePage
           isConnected={isConnected}
-          onJoinRoom={onJoinRoom}
+          onSelectRoom={onSelectRoom}
           onSubmitSelectedDeviceId={onSubmitSelectedDeviceId}
           hasLocalMediaStream={!!localMediaStream}
+          hasSelectedRoom={!!roomName}
         />
       )}
     </IonApp>

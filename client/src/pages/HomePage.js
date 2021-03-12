@@ -1,8 +1,4 @@
-import {
-  IonPage,
-  IonContent,
-  IonSpinner,
-} from '@ionic/react'
+import { IonPage, IonContent, IonSpinner } from '@ionic/react'
 import CameraSelectorCard from '../components/CameraSelectorCard'
 import RoomSelectorCard from '../components/RoomSelectorCard'
 
@@ -10,7 +6,8 @@ function HomePage({
   isConnected,
   hasLocalMediaStream,
   onSubmitSelectedDeviceId,
-  onJoinRoom,
+  onSelectRoom,
+  hasSelectedRoom,
 }) {
   return (
     <IonPage>
@@ -20,8 +17,8 @@ function HomePage({
             <CameraSelectorCard
               onSubmitSelectedDeviceId={onSubmitSelectedDeviceId}
             />
-          ) : isConnected ? (
-            <RoomSelectorCard onJoinRoom={onJoinRoom} />
+          ) : isConnected && !hasSelectedRoom ? (
+            <RoomSelectorCard onSelectRoom={onSelectRoom} />
           ) : (
             <IonSpinner />
           )}

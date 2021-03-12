@@ -41,6 +41,22 @@ function startSignalingServer() {
   io.on('connect', (socket) => {
     console.log('client connect', { socketId: socket.id })
 
+    socket.on('welcome', async ({ roomName }, ack) => {
+      console.log('welcome', { socketId: socket.id, roomName })
+
+      let response, routerRtpCapabilities
+
+      try {
+        response = await axiosIntance.get(`/rooms/${roomName}`)
+        routerRtpCapabilities = response.data.routerRtpCapabilities
+      } catch (error) {
+        console.error(error.message)
+        return
+      }
+
+      ack({ routerRtpCapabilities })
+    })
+
     socket.on('disconnecting', () => {
       const roomName = getRoomName()
       if (roomName && socket.rooms.has(roomName)) {
@@ -53,48 +69,41 @@ function startSignalingServer() {
       // TODO: close peer
     })
 
-    socket.on('create-transport', async ({ direction, toSocketId }, ack) => {
-      const roomName = getRoomName()
-      if (!roomName) {
-        return
-      }
-
-      console.log('create-transport', {
-        socketId: socket.id,
-        direction,
-        toSocketId,
-        roomName,
-      })
-
-      let response, transportOptions
-
-      try {
-        response = await axiosIntance.post(`/rooms/${roomName}/transports`, {
+    socket.on(
+      'create-transport',
+      async ({ direction, toSocketId, roomName }, ack) => {
+        console.log('create-transport', {
           socketId: socket.id,
           direction,
           toSocketId,
+          roomName,
         })
-        transportOptions = response.data.transportOptions
-      } catch (error) {
-        console.error(
-          `Could not create transport for ${socket.id}:`,
-          error.message
-        )
-        ack({ error: `Could not create transport` })
-        return
-      }
 
-      ack({ transportOptions })
-    })
+        let response, transportOptions
 
-    socket.on(
-      'connect-transport',
-      async ({ transportId, dtlsParameters }, ack) => {
-        const roomName = getRoomName()
-        if (!roomName) {
+        try {
+          response = await axiosIntance.post(`/rooms/${roomName}/transports`, {
+            socketId: socket.id,
+            direction,
+            toSocketId,
+          })
+          transportOptions = response.data.transportOptions
+        } catch (error) {
+          console.error(
+            `Could not create transport for ${socket.id}:`,
+            error.message
+          )
+          ack({ error: `Could not create transport` })
           return
         }
 
+        ack({ transportOptions })
+      }
+    )
+
+    socket.on(
+      'connect-transport',
+      async ({ transportId, dtlsParameters, roomName }, ack) => {
         console.log('connect-transport', {
           socketId: socket.id,
           transportId,
@@ -125,11 +134,10 @@ function startSignalingServer() {
 
     socket.on(
       'send-track',
-      async ({ transportId, kind, rtpParameters, paused, appData }, ack) => {
-        const roomName = getRoomName()
-        if (!roomName) {
-          return
-        }
+      async (
+        { transportId, kind, rtpParameters, paused, appData, roomName },
+        ack
+      ) => {
         console.log('send-track', {
           socketId: socket.id,
           transportId,
@@ -137,6 +145,7 @@ function startSignalingServer() {
           rtpParameters,
           paused,
           appData,
+          roomName,
         })
 
         let response, producerId
@@ -168,23 +177,45 @@ function startSignalingServer() {
     socket.on(
       'recv-track',
       async ({ toSocketId, mediaTag, rtpCapabilities, transportId }, ack) => {
+        const roomName = getRoomName()
+        if (!roomName) {
+          return
+        }
+
         console.log('recv-track', {
           socketId: socket.id,
           toSocketId,
           mediaTag,
           rtpCapabilities,
           transportId,
+          roomName,
         })
-        // TODO: create consumer in the transport
+
+        let response
+
+        try {
+          response = await axiosIntance.post(
+            `/rooms/${roomName}/transports/${transportId}/consumers`,
+            {
+              socketId: socket.id,
+              toSocketId,
+              mediaTag,
+              rtpCapabilities,
+            }
+          )
+        } catch (error) {
+          console.error(
+            `Could not create a consumer for ${socket.id}:${toSocketId}:`,
+            error.message
+          )
+          return ack({ error: 'Could not create a consumer' })
+        }
+
+        ack({ ...response.data })
       }
     )
 
-    socket.on('close-transport', async ({ transportId }, ack) => {
-      const roomName = getRoomName()
-      if (!roomName) {
-        return
-      }
-
+    socket.on('close-transport', async ({ transportId, roomName }, ack) => {
       console.log('close-transport', {
         socketId: socket.id,
         transportId,
@@ -213,11 +244,8 @@ function startSignalingServer() {
         return
       }
 
-      let response, routerRtpCapabilities
-
       try {
-        response = await axiosIntance.put(`/rooms/${roomName}`)
-        routerRtpCapabilities = response.data.routerRtpCapabilities
+        await axiosIntance.put(`/rooms/${roomName}`)
       } catch (error) {
         console.error(error.message)
         return
@@ -229,7 +257,6 @@ function startSignalingServer() {
         onlinePeers: Array.from(
           io.of('/').adapter.rooms.get(roomName).values()
         ).filter((socketId) => socketId !== socket.id),
-        routerRtpCapabilities,
       })
       socket.to(roomName).emit('peer-joined', { socketId: socket.id })
     })

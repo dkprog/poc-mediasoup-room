@@ -25,7 +25,7 @@ const ROOM_NAMES = [
   'neptune',
 ]
 
-function RoomSelectorCard({ onJoinRoom }) {
+function RoomSelectorCard({ onSelectRoom }) {
   const [selectedRoomName, setSelectedRoomName] = useState()
 
   return (
@@ -51,8 +51,8 @@ function RoomSelectorCard({ onJoinRoom }) {
           <IonButton
             disabled={!selectedRoomName}
             onClick={() => {
-              if (onJoinRoom) {
-                onJoinRoom(selectedRoomName)
+              if (onSelectRoom) {
+                onSelectRoom(selectedRoomName)
               }
             }}
           >
