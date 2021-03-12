@@ -176,7 +176,7 @@ function startSignalingServer() {
 
     socket.on(
       'recv-track',
-      async ({ toSocketId, mediaTag, rtpCapabilities, transportId }, ack) => {
+      async ({ fromSocketId, mediaTag, rtpCapabilities, transportId }, ack) => {
         const roomName = getRoomName()
         if (!roomName) {
           return
@@ -184,7 +184,7 @@ function startSignalingServer() {
 
         console.log('recv-track', {
           socketId: socket.id,
-          toSocketId,
+          fromSocketId,
           mediaTag,
           rtpCapabilities,
           transportId,
@@ -198,14 +198,14 @@ function startSignalingServer() {
             `/rooms/${roomName}/transports/${transportId}/consumers`,
             {
               socketId: socket.id,
-              toSocketId,
+              toSocketId: fromSocketId,
               mediaTag,
               rtpCapabilities,
             }
           )
         } catch (error) {
           console.error(
-            `Could not create a consumer for ${socket.id}:${toSocketId}:`,
+            `Could not create a consumer for ${socket.id}:${fromSocketId}:`,
             error.message
           )
           return ack({ error: 'Could not create a consumer' })
@@ -215,27 +215,27 @@ function startSignalingServer() {
       }
     )
 
-    socket.on('close-transport', async ({ transportId, roomName }, ack) => {
-      console.log('close-transport', {
-        socketId: socket.id,
-        transportId,
-        roomName,
-      })
+    // socket.on('close-transport', async ({ transportId, roomName }, ack) => {
+    //   console.log('close-transport', {
+    //     socketId: socket.id,
+    //     transportId,
+    //     roomName,
+    //   })
 
-      try {
-        await axiosIntance.delete(
-          `/rooms/${roomName}/transports/${transportId}`,
-          { data: { socketId: socket.id } }
-        )
-      } catch (error) {
-        console.error(
-          `Could not delete transport #${transportId} for ${socket.id}:`,
-          error.message
-        )
-      }
+    //   try {
+    //     await axiosIntance.delete(
+    //       `/rooms/${roomName}/transports/${transportId}`,
+    //       { data: { socketId: socket.id } }
+    //     )
+    //   } catch (error) {
+    //     console.error(
+    //       `Could not delete transport #${transportId} for ${socket.id}:`,
+    //       error.message
+    //     )
+    //   }
 
-      ack({})
-    })
+    //   ack({})
+    // })
 
     socket.on('join', async ({ roomName }, ack) => {
       if (!roomName) {

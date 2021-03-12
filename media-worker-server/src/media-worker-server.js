@@ -22,10 +22,10 @@ async function main() {
 
   setInterval(() => {
     console.log(
-      'consumers:',
-      [...consumers.values()].map((c) => [c.id, c.appData.clientDirection])
+      'transports:',
+      [...transports.values()].map((t) => [t.id, t.appData.clientDirection])
     )
-  }, 1000)
+  }, 5000)
 }
 
 async function startMediasoup() {
@@ -81,22 +81,22 @@ function startWebserver() {
     console.log(`Listening HTTP in port ${PORT}`)
   })
 
-  app.delete('/rooms/:roomName/transports/:transportId', async (req, res) => {
-    const { socketId } = req.body
-    const { transportId } = req.params
+  // app.delete('/rooms/:roomName/transports/:transportId', async (req, res) => {
+  //   const { socketId } = req.body
+  //   const { transportId } = req.params
 
-    const transport = transports.get(transportId)
+  //   const transport = transports.get(transportId)
 
-    if (!transport) {
-      return res.sendStatus(404)
-    } else if (transport.appData.socketId !== socketId) {
-      return res.sendStatus(403)
-    }
+  //   if (!transport) {
+  //     return res.sendStatus(404)
+  //   } else if (transport.appData.socketId !== socketId) {
+  //     return res.sendStatus(403)
+  //   }
 
-    await transport.close()
-    transports.delete(transport.id)
-    return res.sendStatus(200)
-  })
+  //   await transport.close()
+  //   transports.delete(transport.id)
+  //   return res.sendStatus(200)
+  // })
 
   app.put('/rooms/:roomName/transports/:transportId', async (req, res) => {
     const { socketId, dtlsParameters } = req.body
