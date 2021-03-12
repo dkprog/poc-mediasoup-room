@@ -19,6 +19,13 @@ main()
 async function main() {
   await startMediasoup()
   startWebserver()
+
+  setInterval(() => {
+    console.log(
+      'consumers:',
+      [...consumers.values()].map((c) => [c.id, c.appData.clientDirection])
+    )
+  }, 1000)
 }
 
 async function startMediasoup() {
@@ -45,6 +52,12 @@ function startWebserver() {
   })
 
   app.put('/rooms/:roomName', (req, res) => {
+    return res.sendStatus(200)
+  })
+
+  app.delete('/rooms/:roomName', async (req, res) => {
+    const { socketId } = req.body
+    await closePeer(socketId)
     return res.sendStatus(200)
   })
 
@@ -146,7 +159,6 @@ function startWebserver() {
       }
 
       producers.set(producer.id, producer)
-      console.log(producer)
       return res.json({ producerId: producer.id })
     }
   )
@@ -162,7 +174,6 @@ function startWebserver() {
       )
 
       if (!producer) {
-        console.log(producers.values())
         console.error(
           `service-side producer for ${toSocketId}:${mediaTag} not found`
         )
@@ -190,14 +201,12 @@ function startWebserver() {
 
       consumer.on('transportclose', async () => {
         console.log(`consumer's transport closed`, consumer.id)
-        // TODO:
-        // await closeConsumer(consumer)
+        await closeConsumer(consumer)
       })
 
       consumer.on('producerclose', async () => {
         console.log(`consumer's producer closed`, consumer.id)
-        // TODO:
-        // await closeConsumer(consumer)
+        await closeConsumer(consumer)
       })
 
       consumers.set(consumer.id, consumer)
@@ -232,6 +241,31 @@ async function createWebRtcTransport({ socketId, direction, toSocketId }) {
   return transport
 }
 
+async function closePeer(socketId) {
+  console.log('closing peer', { socketId })
+  for (const [, transport] of transports) {
+    if (
+      transport.appData.socketId === socketId ||
+      transport.appData.toSocketId === socketId
+    ) {
+      await closeTransport(transport)
+    }
+  }
+}
+
+async function closeTransport(transport) {
+  try {
+    console.log('closing transport', {
+      transportId: transport.id,
+      appData: transport.appData,
+    })
+    await transport.close()
+    transports.delete(transport.id)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 async function closeProducer(producer) {
   console.log('closing producer', {
     producerId: producer.id,
@@ -241,6 +275,20 @@ async function closeProducer(producer) {
   try {
     await producer.close()
     producers.delete(producer.id)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function closeConsumer(consumer) {
+  console.log('closing consumer', {
+    consumerId: consumer.id,
+    appData: consumer.appData,
+  })
+
+  try {
+    await consumer.close()
+    consumers.delete(consumer.id)
   } catch (error) {
     console.error(error)
   }

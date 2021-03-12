@@ -57,16 +57,16 @@ function startSignalingServer() {
       ack({ routerRtpCapabilities })
     })
 
-    socket.on('disconnecting', () => {
+    socket.on('disconnecting', async () => {
       const roomName = getRoomName()
       if (roomName && socket.rooms.has(roomName)) {
         io.to(roomName).emit('peer-left', { socketId: socket.id })
+        await closePeer(roomName)
       }
     })
 
     socket.on('disconnect', async () => {
       console.log('client disconnect', { socketId: socket.id })
-      // TODO: close peer
     })
 
     socket.on(
@@ -232,8 +232,6 @@ function startSignalingServer() {
           `Could not delete transport #${transportId} for ${socket.id}:`,
           error.message
         )
-        ack({ error: `Could not delete transport` })
-        return
       }
 
       ack({})
@@ -242,6 +240,9 @@ function startSignalingServer() {
     socket.on('join', async ({ roomName }, ack) => {
       if (!roomName) {
         return
+      }
+      if (getRoomName()) {
+        return //already joined
       }
 
       try {
@@ -271,11 +272,21 @@ function startSignalingServer() {
       socket.leave(roomName)
       ack()
       io.to(roomName).emit('peer-left', { socketId: socket.id })
-      // TODO: close recv transports
+      await closePeer(roomName)
     })
 
     function getRoomName() {
       return Array.from(socket.rooms).find((roomName) => roomName !== socket.id)
+    }
+
+    async function closePeer(roomName) {
+      try {
+        await axiosIntance.delete(`/rooms/${roomName}`, {
+          data: { socketId: socket.id },
+        })
+      } catch (error) {
+        console.error(`Could not close peer:`, error.message)
+      }
     }
   })
 }
