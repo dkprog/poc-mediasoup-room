@@ -215,28 +215,6 @@ function startSignalingServer() {
       }
     )
 
-    // socket.on('close-transport', async ({ transportId, roomName }, ack) => {
-    //   console.log('close-transport', {
-    //     socketId: socket.id,
-    //     transportId,
-    //     roomName,
-    //   })
-
-    //   try {
-    //     await axiosIntance.delete(
-    //       `/rooms/${roomName}/transports/${transportId}`,
-    //       { data: { socketId: socket.id } }
-    //     )
-    //   } catch (error) {
-    //     console.error(
-    //       `Could not delete transport #${transportId} for ${socket.id}:`,
-    //       error.message
-    //     )
-    //   }
-
-    //   ack({})
-    // })
-
     socket.on('join', async ({ roomName }, ack) => {
       if (!roomName) {
         return
