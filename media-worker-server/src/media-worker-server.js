@@ -56,13 +56,13 @@ function startWebserver() {
   })
 
   app.put('/rooms/:roomName', (req, res) => {
-    return res.sendStatus(200)
+    return res.json({ roomName: req.params.roomName })
   })
 
   app.delete('/rooms/:roomName', async (req, res) => {
     const { socketId } = req.body
     await closePeer(socketId)
-    return res.sendStatus(200)
+    return res.json({ roomName: req.params.roomName })
   })
 
   app.post('/rooms/:roomName/transports', async (req, res) => {
@@ -92,9 +92,9 @@ function startWebserver() {
     const transport = transports.get(transportId)
 
     if (!transport) {
-      return res.sendStatus(404)
+      return res.status(404).json({ error: 'Transport not found' })
     } else if (transport.appData.socketId !== socketId) {
-      return res.sendStatus(403)
+      return res.status(403).json({ error: 'Transport is forbidden' })
     }
 
     try {
@@ -106,10 +106,10 @@ function startWebserver() {
         dtlsParameters,
         error,
       })
-      return res.sendStatus(500)
+      return res.status(500).json({ error: 'Could not connect transport' })
     }
 
-    return res.sendStatus(200)
+    return res.json({})
   })
 
   app.post(
@@ -121,9 +121,9 @@ function startWebserver() {
       const transport = transports.get(transportId)
 
       if (!transport) {
-        return res.sendStatus(404)
+        return res.status(404).json({ error: 'Transport not found' })
       } else if (transport.appData.socketId !== socketId) {
-        return res.sendStatus(403)
+        return res.status(403).json({ error: 'Transport is forbidden' })
       }
 
       let producer = await transport.produce({
@@ -164,19 +164,21 @@ function startWebserver() {
         console.error(
           `service-side producer for ${toSocketId}:${mediaTag} not found`
         )
-        return res.sendStatus(400)
+        return res.status(404).json({ error: 'Producer not found' })
       }
 
       let transport = transports.get(transportId)
 
       if (!transport) {
         console.error(`service-side recv transport #${transportId} not found`)
-        return res.sendStatus(400)
+        return res.status(404).json({ error: 'Transport not found' })
       }
 
       if (!router.canConsume({ producerId: producer.id, rtpCapabilities })) {
         console.error(`client cannot consume ${toSocketId}:${mediaTag}`)
-        return res.sendStatus(500)
+        return res
+          .status(500)
+          .json({ error: "Router can't consume from producer" })
       }
 
       let consumer = await transport.consume({
