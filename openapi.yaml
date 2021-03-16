@@ -1,0 +1,238 @@
+---
+openapi: 3.0.0
+info:
+  title: media-worker-server API
+  description: This is an example of using media-worker-server's REST API
+  version: 1.0.0
+servers:
+- url: /
+paths:
+  /rooms/:roomName:
+    get:
+      summary: Return an object with parameters needed by mediasoup clients to start  establishing a connection to a given room
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              example:
+                routerRtpCapabilities:
+                  codecs: []
+                  headerExtensions: []
+    put:
+      summary: Join a peer into the room. Creates the room if not exists
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/body'
+        required: true
+      responses:
+        "200":
+          description: Ok
+  /rooms/:roomName/peers/:socketId:
+    delete:
+      summary: Leave a peer out of the room. Close the room if empty
+      responses:
+        "200":
+          description: Ok
+  /rooms/:roomName/transports:
+    post:
+      summary: Create a new transport in the media worker
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/body_1'
+        required: true
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200'
+  /rooms/:roomName/transports/:transportId:
+    put:
+      summary: Connect a transport
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/body_2'
+        required: true
+      responses:
+        "200":
+          description: Ok
+        "404":
+          description: Transport not found
+        "403":
+          description: Transport is forbidden for socketId
+        "500":
+          description: Can't connect transport
+  /rooms/:roomName/transports/:transportId/producers:
+    post:
+      summary: Create a producer in the transport
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/body_3'
+        required: true
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_1'
+        "404":
+          description: Transport not found
+        "403":
+          description: Transport is forbidden for socketId
+        "500":
+          description: Can't create producer
+  /rooms/:roomName/transports/:transportId/consumers:
+    post:
+      summary: Create a consumer in the transport
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/body_4'
+        required: true
+      responses:
+        "200":
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_2'
+        "404":
+          description: Producer or transport not found
+        "500":
+          description: Router can't consume from producer
+components:
+  schemas:
+    body:
+      type: object
+      properties:
+        socketId:
+          type: string
+    body_1:
+      required:
+      - direction
+      - socketId
+      type: object
+      properties:
+        socketId:
+          type: string
+        direction:
+          type: string
+          enum:
+          - send
+          - recv
+        toSocketId:
+          type: string
+    inline_response_200:
+      type: object
+      properties:
+        transportOptions:
+          type: object
+          properties:
+            id:
+              type: string
+            iceParameters:
+              type: object
+            iceCandidates:
+              type: array
+              items:
+                type: object
+            dtlsParameters:
+              type: object
+    body_2:
+      required:
+      - dtlsParameters
+      - socketId
+      type: object
+      properties:
+        socketId:
+          type: string
+        dtlsParameters:
+          type: object
+    roomsroomNametransportstransportIdproducers_appData:
+      type: object
+      properties:
+        mediaTag:
+          type: string
+          enum:
+          - camera-video
+          - camera-audio
+    body_3:
+      required:
+      - appData
+      - kind
+      - paused
+      - rtpParameters
+      - socketId
+      type: object
+      properties:
+        socketId:
+          type: string
+        kind:
+          type: string
+          enum:
+          - video
+          - audio
+        rtpParameters:
+          type: object
+        paused:
+          type: boolean
+        appData:
+          $ref: '#/components/schemas/roomsroomNametransportstransportIdproducers_appData'
+    inline_response_200_1:
+      type: object
+      properties:
+        producerId:
+          type: string
+    body_4:
+      required:
+      - mediaTag
+      - rtpCapabilities
+      - socketId
+      - toSocketId
+      type: object
+      properties:
+        socketId:
+          type: string
+        toSocketId:
+          type: string
+        mediaTag:
+          type: string
+          enum:
+          - camera-video
+          - camera-audio
+        rtpCapabilities:
+          type: object
+    inline_response_200_2:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Consumer id
+        producerId:
+          type: string
+        kind:
+          type: string
+          description: Consumer's type
+          enum:
+          - video
+          - audio
+        rtpParameters:
+          type: object
+        type:
+          type: string
+          description: One of mediasoup's ConsumerType
+        producerPaused:
+          type: boolean
+          description: Whether the associated producer is paused.
