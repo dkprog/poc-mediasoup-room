@@ -259,9 +259,7 @@ function startSignalingServer() {
 
     async function closePeer(roomName) {
       try {
-        await axiosIntance.delete(`/rooms/${roomName}`, {
-          data: { socketId: socket.id },
-        })
+        await axiosIntance.delete(`/rooms/${roomName}/peers/${socket.id}`)
       } catch (error) {
         console.error(`Could not close peer:`, error.message)
       }

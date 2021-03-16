@@ -59,10 +59,10 @@ function startWebserver() {
     return res.json({ roomName: req.params.roomName })
   })
 
-  app.delete('/rooms/:roomName', async (req, res) => {
-    const { socketId } = req.body
+  app.delete('/rooms/:roomName/peers/:socketId', async (req, res) => {
+    const { socketId } = req.params
     await closePeer(socketId)
-    return res.json({ roomName: req.params.roomName })
+    return res.json({ roomName: req.params.roomName, socketId })
   })
 
   app.post('/rooms/:roomName/transports', async (req, res) => {
