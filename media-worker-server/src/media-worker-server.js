@@ -23,7 +23,11 @@ async function main() {
   setInterval(() => {
     console.log(
       'transports:',
-      [...transports.values()].map((t) => [t.id, t.appData.clientDirection])
+      [...transports.values()].map((t) => [t.id, t.appData.clientDirection]),
+      'producers:',
+      [...producers.values()].map((p) => p.id),
+      'consumers:',
+      [...consumers.values()].map((c) => c.id)
     )
   }, 5000)
 }

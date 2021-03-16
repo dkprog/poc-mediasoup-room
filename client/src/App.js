@@ -1,8 +1,13 @@
 import { IonApp } from '@ionic/react'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import * as mediasoup from 'mediasoup-client'
 
-import { client, startCamera, sendStream, receiveVideoTrack } from './client'
+import {
+  client,
+  startCamera,
+  createSendTransport,
+  subscribeToRemoteTrack,
+} from './client'
 
 import '@ionic/react/css/core.css'
 import '@ionic/react/css/normalize.css'
@@ -18,9 +23,7 @@ import '@ionic/react/css/display.css'
 import HomePage from './pages/HomePage'
 import RoomPage from './pages/RoomPage'
 
-let device,
-  recvTransports = [],
-  consumers = []
+let device
 
 function App() {
   const [cameraDeviceId, setCameraDeviceId] = useState()
@@ -30,6 +33,51 @@ function App() {
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false)
   const [onlinePeers, setOnlinePeers] = useState([])
   const [remoteStreams, setRemoteStreams] = useState({})
+
+  const subscribeToRemoteVideoTrack = useCallback(
+    async (socketId) => {
+      if (!roomName) {
+        return
+      }
+
+      const videoTrack = await subscribeToRemoteTrack(
+        device,
+        roomName,
+        socketId,
+        'cam-video'
+      )
+      const mediaStream = new MediaStream([videoTrack])
+
+      setRemoteStreams((prevRemoteStreams) => {
+        const remoteStreams = { ...prevRemoteStreams }
+
+        remoteStreams[socketId] = mediaStream
+        return remoteStreams
+      })
+    },
+    [roomName]
+  )
+
+  const closeRemoteVideoTrack = useCallback((socketId) => {
+    setRemoteStreams((prevRemoteStreams) => {
+      const remoteStreams = { ...prevRemoteStreams }
+      if (socketId in remoteStreams) {
+        remoteStreams[socketId].getVideoTracks()[0].stop()
+        delete remoteStreams[socketId]
+      }
+      return remoteStreams
+    })
+  }, [])
+
+  const closeAllRemoteVideoTracks = useCallback(() => {
+    setRemoteStreams((prevRemoteStreams) => {
+      const remoteStreams = { ...prevRemoteStreams }
+      Object.keys(remoteStreams).forEach((socketId) =>
+        remoteStreams[socketId].getVideoTracks()[0].stop()
+      )
+      return {}
+    })
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -56,7 +104,8 @@ function App() {
           .filter((peerSocketId) => peerSocketId !== socketId)
           .concat(socketId)
       )
-      await receiveVideoTrack(socketId)
+
+      await subscribeToRemoteVideoTrack(socketId)
     }
 
     const onPeerLeftRoom = async ({ socketId }) => {
@@ -65,8 +114,7 @@ function App() {
       setOnlinePeers((onlinePeers) =>
         onlinePeers.filter((peerSocketId) => peerSocketId !== socketId)
       )
-      closeRecvTransport(socketId)
-      removeClosedConsumers()
+      await closeRemoteVideoTrack(socketId)
     }
 
     client.on('connect', onConnect)
@@ -80,7 +128,7 @@ function App() {
       client.off('peer-joined', onPeerJoinedRoom)
       client.off('peer-left', onPeerLeftRoom)
     }
-  }, [])
+  }, [subscribeToRemoteVideoTrack, closeRemoteVideoTrack])
 
   useEffect(() => {
     if (!cameraDeviceId) {
@@ -109,13 +157,13 @@ function App() {
           if (!device.canProduce('video')) {
             console.error("This device can't produce video")
           } else {
-            await sendStream(device, roomName, localMediaStream)
+            await createSendTransport(device, roomName, localMediaStream)
             client.emit('join', { roomName }, ({ onlinePeers }) => {
               console.log('joined', { roomName, onlinePeers })
               setHasJoinedRoom(true)
               setOnlinePeers(onlinePeers)
               onlinePeers.forEach(async (toSocketId) => {
-                // TODO: await subscribeToRemoteVideoTrack(toSocketId)
+                await subscribeToRemoteVideoTrack(toSocketId)
               })
             })
           }
@@ -124,7 +172,7 @@ function App() {
     }
 
     emitWelcome()
-  }, [roomName, isConnected, localMediaStream])
+  }, [roomName, isConnected, localMediaStream, subscribeToRemoteVideoTrack])
 
   const onSelectDeviceId = (deviceId) => {
     setCameraDeviceId(deviceId)
@@ -137,11 +185,10 @@ function App() {
   const onLeftRoomButtonClick = () => {
     client.emit('leave', () => {
       console.log(`left ${roomName}`)
-      // TODO: close all recv transports
-      // TODO: remove closed consumers
       setRoomName(null)
       setHasJoinedRoom(false)
       setOnlinePeers([])
+      closeAllRemoteVideoTracks()
     })
   }
 

@@ -176,7 +176,7 @@ function startSignalingServer() {
 
     socket.on(
       'recv-track',
-      async ({ fromSocketId, mediaTag, rtpCapabilities, transportId }, ack) => {
+      async ({ toSocketId, mediaTag, rtpCapabilities, transportId }, ack) => {
         const roomName = getRoomName()
         if (!roomName) {
           return
@@ -184,7 +184,7 @@ function startSignalingServer() {
 
         console.log('recv-track', {
           socketId: socket.id,
-          fromSocketId,
+          toSocketId,
           mediaTag,
           rtpCapabilities,
           transportId,
@@ -198,14 +198,14 @@ function startSignalingServer() {
             `/rooms/${roomName}/transports/${transportId}/consumers`,
             {
               socketId: socket.id,
-              toSocketId: fromSocketId,
+              toSocketId: toSocketId,
               mediaTag,
               rtpCapabilities,
             }
           )
         } catch (error) {
           console.error(
-            `Could not create a consumer for ${socket.id}:${fromSocketId}:`,
+            `Could not create a consumer for ${socket.id}:${toSocketId}:`,
             error.message
           )
           return ack({ error: 'Could not create a consumer' })

@@ -128,7 +128,7 @@ async function createTransport(device, direction, roomName, toSocketId) {
   return transport
 }
 
-async function sendStream(device, roomName, localMediaStream) {
+async function createSendTransport(device, roomName, localMediaStream) {
   const sendTransport = await createTransport(device, 'send', roomName)
   await createVideoProducer(sendTransport, localMediaStream)
 }
@@ -141,18 +141,18 @@ async function createVideoProducer(sendTransport, localMediaStream) {
   })
 }
 
-async function receiveVideoTrack(device, roomName, fromSocketId) {
-  return receiveTrack(device, roomName, fromSocketId, 'cam-video')
+async function createRecvTransport(device, roomName, toSocketId) {
+  return await createTransport(device, 'recv', roomName, toSocketId)
 }
 
-async function receiveTrack(device, roomName, fromSocketId, mediaTag) {
-  const recvTransport = await createTransport(device, 'recv', roomName)
+async function subscribeToRemoteTrack(device, roomName, toSocketId, mediaTag) {
+  let recvTransport = await createRecvTransport(device, roomName, toSocketId)
 
   const consumerParameters = await new Promise((resolve, reject) => {
     client.emit(
       'recv-track',
       {
-        fromSocketId,
+        toSocketId,
         mediaTag,
         rtpCapabilities: device.rtpCapabilities,
         transportId: recvTransport.id,
@@ -166,15 +166,14 @@ async function receiveTrack(device, roomName, fromSocketId, mediaTag) {
       }
     )
   })
-
   console.log('consumer parameters', { consumerParameters })
 
   const consumer = await recvTransport.consume({
     ...consumerParameters,
-    appData: { toSocketId: fromSocketId, mediaTag },
+    appData: { toSocketId, mediaTag },
   })
 
-  return consumer
+  return consumer.track.clone()
 }
 
-export { client, startCamera, createTransport, sendStream, receiveVideoTrack }
+export { client, startCamera, createSendTransport, subscribeToRemoteTrack }
