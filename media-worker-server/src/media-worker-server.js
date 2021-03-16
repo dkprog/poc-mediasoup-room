@@ -55,7 +55,7 @@ function startWebserver() {
     return res.json({ routerRtpCapabilities: router.rtpCapabilities })
   })
 
-  app.put('/rooms/:roomName', (req, res) => {
+  app.post('/rooms/:roomName/peers', (req, res) => {
     return res.json({ roomName: req.params.roomName })
   })
 
@@ -66,10 +66,10 @@ function startWebserver() {
   })
 
   app.post('/rooms/:roomName/transports', async (req, res) => {
-    const { socketId, direction, toSocketId } = req.body
+    const { fromSocketId, direction, toSocketId } = req.body
 
     const transport = await createWebRtcTransport({
-      socketId,
+      fromSocketId,
       direction,
       toSocketId,
     })
@@ -122,7 +122,7 @@ function startWebserver() {
 
       if (!transport) {
         return res.status(404).json({ error: 'Transport not found' })
-      } else if (transport.appData.socketId !== socketId) {
+      } else if (transport.appData.fromSocketId !== socketId) {
         return res.status(403).json({ error: 'Transport is forbidden' })
       }
 
@@ -153,7 +153,7 @@ function startWebserver() {
   app.post(
     `/rooms/:roomName/transports/:transportId/consumers`,
     async (req, res) => {
-      const { socketId, toSocketId, mediaTag, rtpCapabilities } = req.body
+      const { fromSocketId, toSocketId, mediaTag, rtpCapabilities } = req.body
       const { transportId } = req.params
       const producer = Array.from(producers.values()).find(
         (p) =>
@@ -185,7 +185,7 @@ function startWebserver() {
         producerId: producer.id,
         rtpCapabilities,
         paused: false,
-        appData: { socketId, toSocketId },
+        appData: { fromSocketId, toSocketId },
       })
 
       consumer.on('transportclose', async () => {
@@ -212,7 +212,7 @@ function startWebserver() {
   )
 }
 
-async function createWebRtcTransport({ socketId, direction, toSocketId }) {
+async function createWebRtcTransport({ fromSocketId, direction, toSocketId }) {
   const transport = await router.createWebRtcTransport({
     listenIps: [
       {
@@ -224,7 +224,7 @@ async function createWebRtcTransport({ socketId, direction, toSocketId }) {
     enableTcp: true,
     preferUdp: true,
     initialAvailableOutgoingBitrate: 800000,
-    appData: { socketId, clientDirection: direction, toSocketId },
+    appData: { fromSocketId, clientDirection: direction, toSocketId },
   })
 
   return transport
@@ -234,7 +234,7 @@ async function closePeer(socketId) {
   console.log('closing peer', { socketId })
   for (const [, transport] of transports) {
     if (
-      transport.appData.socketId === socketId ||
+      transport.appData.fromSocketId === socketId ||
       transport.appData.toSocketId === socketId
     ) {
       await closeTransport(transport)

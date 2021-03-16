@@ -73,7 +73,7 @@ function startSignalingServer() {
       'create-transport',
       async ({ direction, toSocketId, roomName }, ack) => {
         console.log('create-transport', {
-          socketId: socket.id,
+          fromSocketId: socket.id,
           direction,
           toSocketId,
           roomName,
@@ -83,7 +83,7 @@ function startSignalingServer() {
 
         try {
           response = await axiosIntance.post(`/rooms/${roomName}/transports`, {
-            socketId: socket.id,
+            fromSocketId: socket.id,
             direction,
             toSocketId,
           })
@@ -115,7 +115,7 @@ function startSignalingServer() {
           await axiosIntance.put(
             `/rooms/${roomName}/transports/${transportId}`,
             {
-              socketId: socket.id,
+              fromSocketId: socket.id,
               dtlsParameters,
             }
           )
@@ -183,7 +183,7 @@ function startSignalingServer() {
         }
 
         console.log('recv-track', {
-          socketId: socket.id,
+          fromSocketId: socket.id,
           toSocketId,
           mediaTag,
           rtpCapabilities,
@@ -197,7 +197,7 @@ function startSignalingServer() {
           response = await axiosIntance.post(
             `/rooms/${roomName}/transports/${transportId}/consumers`,
             {
-              socketId: socket.id,
+              fromSocketId: socket.id,
               toSocketId: toSocketId,
               mediaTag,
               rtpCapabilities,
@@ -224,7 +224,7 @@ function startSignalingServer() {
       }
 
       try {
-        await axiosIntance.put(`/rooms/${roomName}`)
+        await axiosIntance.post(`/rooms/${roomName}/peers`)
       } catch (error) {
         console.error(error.message)
         return
