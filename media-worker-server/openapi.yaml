@@ -1,7 +1,7 @@
 openapi: 3.0.0
 servers: []
 info:
-  version: 1.0.0
+  version: 0.1.0
   title: media-worker-server API
   description: >-
     This is an example of using media-worker-server's REST API
