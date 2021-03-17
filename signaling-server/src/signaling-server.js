@@ -6,14 +6,14 @@ import axios from 'axios'
 
 dotenv.config()
 
-let axiosIntance, app, httpServer, io
+let axiosInstance, app, httpServer, io
 
 main()
 
 function main() {
-  axiosIntance = axios.create({
+  axiosInstance = axios.create({
     baseURL: process.env.API_BASE_URL,
-    timeout: 1000,
+    timeout: 10000,
   })
 
   startWebserver()
@@ -47,7 +47,8 @@ function startSignalingServer() {
       let response, routerRtpCapabilities
 
       try {
-        response = await axiosIntance.get(`/rooms/${roomName}`)
+        console.log(axiosInstance.defaults.baseURL)
+        response = await axiosInstance.post('/rooms/', { roomName })
         routerRtpCapabilities = response.data.routerRtpCapabilities
       } catch (error) {
         console.error(error.message)
@@ -82,7 +83,7 @@ function startSignalingServer() {
         let response, transportOptions
 
         try {
-          response = await axiosIntance.post(`/rooms/${roomName}/transports`, {
+          response = await axiosInstance.post(`/rooms/${roomName}/transports`, {
             fromSocketId: socket.id,
             direction,
             toSocketId,
@@ -91,7 +92,8 @@ function startSignalingServer() {
         } catch (error) {
           console.error(
             `Could not create transport for ${socket.id}:`,
-            error.message
+            error.message,
+            error?.response?.data
           )
           ack({ error: `Could not create transport` })
           return
@@ -112,7 +114,7 @@ function startSignalingServer() {
         })
 
         try {
-          await axiosIntance.put(
+          await axiosInstance.put(
             `/rooms/${roomName}/transports/${transportId}`,
             {
               fromSocketId: socket.id,
@@ -122,7 +124,8 @@ function startSignalingServer() {
         } catch (error) {
           console.error(
             `Could not connect transport #${transportId} for ${socket.id}:`,
-            error.message
+            error.message,
+            error?.response?.data
           )
           ack({ error: `Could not connect transport` })
           return
@@ -150,7 +153,7 @@ function startSignalingServer() {
 
         let response, producerId
         try {
-          response = await axiosIntance.post(
+          response = await axiosInstance.post(
             `/rooms/${roomName}/transports/${transportId}/producers`,
             {
               socketId: socket.id,
@@ -164,7 +167,8 @@ function startSignalingServer() {
         } catch (error) {
           console.error(
             `Could not send track to the transport #${transportId} for ${socket.id}:`,
-            error.message
+            error.message,
+            error?.response?.data
           )
           ack({ error: `Could not send track` })
           return
@@ -194,7 +198,7 @@ function startSignalingServer() {
         let response
 
         try {
-          response = await axiosIntance.post(
+          response = await axiosInstance.post(
             `/rooms/${roomName}/transports/${transportId}/consumers`,
             {
               fromSocketId: socket.id,
@@ -206,7 +210,8 @@ function startSignalingServer() {
         } catch (error) {
           console.error(
             `Could not create a consumer for ${socket.id}:${toSocketId}:`,
-            error.message
+            error.message,
+            error?.response?.data
           )
           return ack({ error: 'Could not create a consumer' })
         }
@@ -224,7 +229,9 @@ function startSignalingServer() {
       }
 
       try {
-        await axiosIntance.post(`/rooms/${roomName}/peers`)
+        await axiosInstance.post(`/rooms/${roomName}/peers`, {
+          socketId: socket.id,
+        })
       } catch (error) {
         console.error(error.message)
         return
@@ -259,7 +266,7 @@ function startSignalingServer() {
 
     async function closePeer(roomName) {
       try {
-        await axiosIntance.delete(`/rooms/${roomName}/peers/${socket.id}`)
+        await axiosInstance.delete(`/rooms/${roomName}/peers/${socket.id}`)
       } catch (error) {
         console.error(`Could not close peer:`, error.message)
       }
