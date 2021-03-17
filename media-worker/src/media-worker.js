@@ -247,6 +247,7 @@ function startWebserver() {
 
       const transport = transports.get(transportId)
 
+      // TODO: validate transport
       if (!transport) {
         return res.status(404).json({ error: 'Transport not found' })
       }

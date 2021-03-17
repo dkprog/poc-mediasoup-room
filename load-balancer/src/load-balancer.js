@@ -71,7 +71,7 @@ function startWebserver() {
         error.message,
         error?.response?.data
       )
-      return res.json(503).json({ error: 'could not create room' })
+      return res.json(502).json({ error: 'could not create room' })
     }
   })
 
@@ -98,7 +98,9 @@ function startWebserver() {
         error.message,
         error?.response?.data
       )
-      return res.status(503).json({ error: 'could join peer into the room' })
+      return res
+        .status(502)
+        .json({ error: 'could not join peer into the room' })
     }
   })
 
@@ -120,7 +122,9 @@ function startWebserver() {
         error.message,
         error?.response?.data
       )
-      return res.json(503).json({ error: 'could leave peer out of the room' })
+      return res
+        .json(502)
+        .json({ error: 'could not leave peer out of the room' })
     }
   })
 
@@ -153,7 +157,7 @@ function startWebserver() {
         error.message,
         error?.response?.data
       )
-      return res.status(503).json({ error: 'could not create transport' })
+      return res.status(502).json({ error: 'could not create transport' })
     }
   })
 
@@ -190,7 +194,7 @@ function startWebserver() {
           error.message,
           error?.response?.data
         )
-        return res.status(503).json({ error: 'could not update transport' })
+        return res.status(502).json({ error: 'could not update transport' })
       }
     }
   )
@@ -232,7 +236,7 @@ function startWebserver() {
           error.message,
           error?.response?.data
         )
-        return res.status(503).json({ error: 'could not create producer' })
+        return res.status(502).json({ error: 'could not create producer' })
       }
     }
   )
@@ -273,7 +277,7 @@ function startWebserver() {
           error.message,
           error?.response?.data
         )
-        return res.status(503).json({ error: 'could not create consumer' })
+        return res.status(502).json({ error: 'could not create consumer' })
       }
     }
   )
