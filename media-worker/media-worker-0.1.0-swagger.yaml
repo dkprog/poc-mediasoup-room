@@ -1,0 +1,244 @@
+openapi: 3.0.0
+info:
+  version: 0.1.0
+  title: Media Worker API
+paths:
+  '/rooms':
+    post:
+      summary: >- 
+        Create a room
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: object
+              properties:
+                roomName:
+                  type: string
+                  description: Name of the room (its unique identifier)
+              required: 
+                - roomName
+      responses:
+        '200':
+          description: Room created
+          content:
+            'application/json':
+              example: 
+                {
+                  'routerRtpCapabilities':{'codecs':[], 'headerExtensions':[]}
+                }
+        '400':
+          description: roomName is not defined
+  '/rooms/:roomName/peers':
+    post:
+      summary: >-
+        Join a peer to a room
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: object
+              properties:
+                socketId:
+                  type: string
+                  description: Peer's socket-io ID
+              required:
+                - socketId
+      responses:
+        '200':
+          description: Peer joined room
+          content:
+            'application/json':
+              schema:
+                type: object
+                properties:
+                  roomName: 
+                    type: string
+                  socketId:
+                    type: string
+        '400':
+          description: socketId is not defined  
+  '/rooms/:roomName/peers/:socketId':
+    delete:
+      summary: >-
+        Leave a peer out of the room. Close the room if empty
+      responses:
+        '200':
+          description: Peer left room
+          content:
+            'application/json':
+              schema:
+                type: object
+                properties:
+                  roomName: 
+                    type: string
+                  socketId:
+                    type: string
+  '/rooms/:roomName/transports':
+    post:
+      summary: >-
+        Create a new mediasoup transport
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: object
+              properties:
+                fromSocketId:
+                  type: string
+                direction:
+                  type: string
+                  enum:
+                    - 'send'
+                    - 'recv'
+                toSocketId:
+                  type: string
+              required:
+                - fromSocketId
+                - direction
+      responses:
+        '200':
+          description: Transport created
+          content:
+            'application/json':
+              schema:
+                type: object
+                properties:
+                  transportOptions:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      iceParameters:
+                        type: object
+                      iceCandidates:
+                        type: array
+                        items:
+                          type: object
+                      dtlsParameters:
+                        type: object
+        '400':
+          description: Bad Request. Client-side input fails validation
+        '500':
+          description: Could not create transport
+  '/rooms/:roomName/transports/:transportId':
+    put:
+      summary: Connect a transport
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: object
+              properties:
+                fromSocketId:
+                  type: string
+                dtlsParameters:
+                  type: object
+              required:
+                - fromSocketId
+                - dtlsParameters
+      responses:
+        '200':
+          description: Transport connected
+        '400':
+          description: Bad Request. Client-side input fails validation
+        '404':
+          description: Transport not found
+        '500':
+          description: Could not connect transport
+  '/rooms/:roomName/transports/:transportId/producers':
+    post:
+      summary: Create a video producer in the transport
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: object
+              properties:
+                socketId:
+                  type: string
+                kind:
+                  type: string
+                  enum:
+                    - 'video'
+                    - 'audio'
+                rtpParameters:
+                  type: object
+                appData:
+                  type: object
+              required: 
+                - socketId
+                - kind
+                - rtpParameters
+      responses:
+        '200':
+          description: Producer created
+          content:
+            'application/json':
+              schema:
+                type: object
+                properties:
+                  producerId:
+                    type: string
+        '400':
+          description: Bad Request. Client-side input fails validation
+        '404':
+          description: Transport not found
+  '/rooms/:roomName/transports/:transportId/consumers':
+    post:
+      summary: Create a video consumer in the transport
+      requestBody:
+        required: true
+        content:
+          'application/json':
+            schema:
+              type: object
+              properties:
+                fromSocketId:
+                  type: string
+                toSocketId:
+                  type: string
+                rtpCapabilities:
+                  type: object
+              required: 
+                - fromSocketId
+                - toSocketId
+                - rtpCapabilities
+      responses:
+        '200':
+          description: Ok
+          content:
+            'application/json':
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Consumer id
+                  producerId:
+                    type: string
+                  kind:
+                    type: string
+                    description: Consumer's type
+                    enum:
+                      - 'video'
+                      - 'audio'
+                  rtpParameters:
+                    type: object
+                  type:
+                    type: string
+                    description: One of mediasoup's ConsumerType
+                  producerPaused:
+                    type: boolean
+                    description: Whether the associated producer is paused.
+        '400':
+          description: Bad Request. Client-side input fails validation
+        '404':
+          description: Producer or Transport not found.
+        '500':
+          description: Router cannot consume from producer
