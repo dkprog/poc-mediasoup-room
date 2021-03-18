@@ -7,6 +7,7 @@ import { MEDIA_CODECS, WORKER_SETTINGS } from './constants'
 import logger from 'morgan'
 import { cpu } from 'node-os-utils'
 import packageJson from '../package.json'
+import { v4 as uuidv4 } from 'uuid'
 
 dotenv.config()
 
@@ -17,11 +18,12 @@ const rooms = new Map(),
   consumers = new Map()
 
 let axiosInstance, app, httpServer, worker
+let workerUUID
 
 main()
 
 async function main() {
-  checkWorkerUUID()
+  setWorkerUUID()
 
   axiosInstance = axios.create({
     baseURL: process.env.LOAD_BALANCER_BASE_URL,
@@ -33,10 +35,10 @@ async function main() {
   startPinger()
 }
 
-function checkWorkerUUID() {
-  if (!process.env.WORKER_UUID) {
-    console.error('Error: WORKER_UUID not defined.')
-    process.exit(1)
+function setWorkerUUID() {
+  workerUUID = process.env.WORKER_UUID
+  if (!workerUUID) {
+    workerUUID = uuidv4()
   }
 }
 
@@ -282,7 +284,7 @@ function startWebserver() {
   httpServer = http.Server(app)
   httpServer.listen(PORT, () => {
     console.log(
-      `${packageJson.name} ${process.env.WORKER_UUID} listening HTTP in port ${PORT}`
+      `${packageJson.name} ${workerUUID} listening HTTP in port ${PORT}`
     )
   })
 }
@@ -307,7 +309,7 @@ function getMediaWorkerStatus() {
   const cpuPercentage = cpu.loadavgTime()
 
   return {
-    uuid: process.env.WORKER_UUID,
+    uuid: workerUUID,
     url: process.env.SELF_BASE_URL,
     cpuPercentage,
     rooms: [...rooms.keys()],
