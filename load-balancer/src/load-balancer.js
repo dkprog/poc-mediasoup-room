@@ -313,7 +313,7 @@ function findNextAvailableWorkerUrl() {
     )
     .sort(
       (a, b) =>
-        a.cpuPercentage - b.cpuPercentage ||
+        // a.cpuPercentage - b.cpuPercentage ||
         a.transports.length - b.transports.length // TODO: invert it in order to full a worker
     )[0]
   if (workerStatus) {
