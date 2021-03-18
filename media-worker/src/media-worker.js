@@ -78,7 +78,7 @@ function startWebserver() {
       rooms.set(roomName, router)
     }
 
-    const mediaWorkerStatus = await getMediaWorkerStatus()
+    const mediaWorkerStatus = getMediaWorkerStatus()
 
     return res.json({
       roomName,
@@ -296,15 +296,15 @@ function startPinger() {
 
 async function pingLoadBalancer() {
   try {
-    const mediaWorkerStatus = await getMediaWorkerStatus()
+    const mediaWorkerStatus = getMediaWorkerStatus()
     await axiosInstance.put(`/worker/status`, mediaWorkerStatus)
   } catch (error) {
     console.error(`Could not ping the load-balancer:`, error.message)
   }
 }
 
-async function getMediaWorkerStatus() {
-  const cpuPercentage = await cpu.usage()
+function getMediaWorkerStatus() {
+  const cpuPercentage = cpu.loadavgTime()
 
   return {
     uuid: process.env.WORKER_UUID,
