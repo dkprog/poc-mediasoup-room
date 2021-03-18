@@ -289,10 +289,14 @@ function findNextAvailableWorkerUrl() {
   let url
   const workerStatus = [...workersStatus.values()]
     .filter((workerStatus) => workerStatus.cpuPercentage <= 60.0)
-    .sort((a, b) => a.cpuPercentage - b.cpuPercentage)[0]
-  console.log(workerStatus)
+    .sort(
+      (a, b) =>
+        a.cpuPercentage - b.cpuPercentage ||
+        a.transports.length - b.transports.length   // TODO: invert it in order to full a worker
+    )[0]
   if (workerStatus) {
     url = workerStatus.url
   }
+  // TODO: create a new machine if no worker is found
   return url
 }
