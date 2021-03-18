@@ -24,6 +24,7 @@ async function main() {
 function startWebserver() {
   const { PORT } = process.env
   app = express()
+  const roomRouter = express.Router()
 
   app.use(express.json())
   app.use(express.urlencoded())
@@ -40,7 +41,6 @@ function startWebserver() {
   })
 
   // TODO: setup a timer to teardown unavaliable workers
-  // TODO: create a middleware to easily access workerUrl from /room/:roomName
 
   app.post('/client/rooms', async (req, res) => {
     const { roomName } = req.body
@@ -74,7 +74,18 @@ function startWebserver() {
     }
   })
 
-  app.post('/client/rooms/:roomName/peers', async (req, res) => {
+  roomRouter.use('/client/rooms/:roomName', async (req, res, next) => {
+    const { roomName } = req.params
+    console.log(roomName, req.params, req.path)
+    const workerUrl = findWorkerUrlByRoomName(roomName)
+    if (!workerUrl) {
+      return res.status(503).json({ error: 'No worker found' })
+    }
+    req.workerUrl = workerUrl
+    next()
+  })
+
+  roomRouter.post('/client/rooms/:roomName/peers', async (req, res) => {
     const { roomName } = req.params
     const { socketId } = req.body
 
@@ -82,12 +93,7 @@ function startWebserver() {
       return res.status(400).json({ error: 'socketId not defined' })
     }
 
-    const workerUrl = findWorkerUrlByRoomName(roomName)
-    if (!workerUrl) {
-      return res.status(503).json({ error: 'No worker found' })
-    }
-
-    const url = new URL(`/rooms/${roomName}/peers`, workerUrl).href
+    const url = new URL(`/rooms/${roomName}/peers`, req.workerUrl).href
     try {
       const response = await axiosInstance.post(url, { socketId })
       return res.json(response.data)
@@ -103,31 +109,30 @@ function startWebserver() {
     }
   })
 
-  app.delete('/client/rooms/:roomName/peers/:socketId', async (req, res) => {
-    const { roomName, socketId } = req.params
+  roomRouter.delete(
+    '/client/rooms/:roomName/peers/:socketId',
+    async (req, res) => {
+      const { roomName, socketId } = req.params
 
-    const workerUrl = findWorkerUrlByRoomName(roomName)
-    if (!workerUrl) {
-      return res.status(503).json({ error: 'No worker found' })
+      const url = new URL(`/rooms/${roomName}/peers/${socketId}`, req.workerUrl)
+        .href
+      try {
+        const response = await axiosInstance.delete(url)
+        return res.json(response.data)
+      } catch (error) {
+        console.error(
+          'could not leave peer out of the room',
+          error.message,
+          error?.response?.data
+        )
+        return res
+          .json(502)
+          .json({ error: 'could not leave peer out of the room' })
+      }
     }
+  )
 
-    const url = new URL(`/rooms/${roomName}/peers/${socketId}`, workerUrl).href
-    try {
-      const response = await axiosInstance.delete(url)
-      return res.json(response.data)
-    } catch (error) {
-      console.error(
-        'could not leave peer out of the room',
-        error.message,
-        error?.response?.data
-      )
-      return res
-        .json(502)
-        .json({ error: 'could not leave peer out of the room' })
-    }
-  })
-
-  app.post('/client/rooms/:roomName/transports', async (req, res) => {
+  roomRouter.post('/client/rooms/:roomName/transports', async (req, res) => {
     const { roomName } = req.params
     const { fromSocketId, direction, toSocketId } = req.body
 
@@ -137,12 +142,7 @@ function startWebserver() {
       return res.status(400).json({ error: 'invalid direction' })
     }
 
-    const workerUrl = findWorkerUrlByRoomName(roomName)
-    if (!workerUrl) {
-      return res.status(503).json({ error: 'No worker found' })
-    }
-
-    const url = new URL(`/rooms/${roomName}/transports`, workerUrl).href
+    const url = new URL(`/rooms/${roomName}/transports`, req.workerUrl).href
     try {
       const response = await axiosInstance.post(url, {
         fromSocketId,
@@ -160,7 +160,7 @@ function startWebserver() {
     }
   })
 
-  app.put(
+  roomRouter.put(
     '/client/rooms/:roomName/transports/:transportId',
     async (req, res) => {
       const { roomName, transportId } = req.params
@@ -172,14 +172,9 @@ function startWebserver() {
         return res.status(400).json({ error: 'dtlsParameters not defined' })
       }
 
-      const workerUrl = findWorkerUrlByRoomName(roomName)
-      if (!workerUrl) {
-        res.status(503).json({ error: 'No worker found' })
-      }
-
       const url = new URL(
         `/rooms/${roomName}/transports/${transportId}`,
-        workerUrl
+        req.workerUrl
       ).href
       try {
         const response = await axiosInstance.put(url, {
@@ -198,7 +193,7 @@ function startWebserver() {
     }
   )
 
-  app.post(
+  roomRouter.post(
     '/client/rooms/:roomName/transports/:transportId/producers',
     async (req, res) => {
       const { roomName, transportId } = req.params
@@ -212,14 +207,9 @@ function startWebserver() {
         return res.status(400).json({ error: 'rtpParameters not defined' })
       }
 
-      const workerUrl = findWorkerUrlByRoomName(roomName)
-      if (!workerUrl) {
-        return res.status(503).json({ error: 'No worker found' })
-      }
-
       const url = new URL(
         `/rooms/${roomName}/transports/${transportId}/producers`,
-        workerUrl
+        req.workerUrl
       ).href
       try {
         const response = await axiosInstance.post(url, {
@@ -240,7 +230,7 @@ function startWebserver() {
     }
   )
 
-  app.post(
+  roomRouter.post(
     `/client/rooms/:roomName/transports/:transportId/consumers`,
     async (req, res) => {
       const { roomName, transportId } = req.params
@@ -254,14 +244,9 @@ function startWebserver() {
         return res.status(400).json({ error: 'rtpCapabilities not defined' })
       }
 
-      const workerUrl = findWorkerUrlByRoomName(roomName)
-      if (!workerUrl) {
-        return res.status(503).json({ error: 'No worker found' })
-      }
-
       const url = new URL(
         `/rooms/${roomName}/transports/${transportId}/consumers`,
-        workerUrl
+        req.workerUrl
       ).href
       try {
         const response = await axiosInstance.post(url, {
@@ -280,6 +265,8 @@ function startWebserver() {
       }
     }
   )
+
+  app.use('/', roomRouter)
 
   httpServer = http.Server(app)
   httpServer.listen(PORT, () => {
