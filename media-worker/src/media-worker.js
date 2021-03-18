@@ -1,5 +1,4 @@
 import express from 'express'
-import bodyParser from 'body-parser'
 import dotenv from 'dotenv-defaults'
 import http from 'http'
 import axios from 'axios'
@@ -54,8 +53,8 @@ function startWebserver() {
   const { PORT } = process.env
   app = express()
 
-  app.use(bodyParser.urlencoded({ extended: false }))
-  app.use(bodyParser.json())
+  app.use(express.json())
+  app.use(express.urlencoded())
   app.use(logger('dev'))
 
   app.post('/rooms', async (req, res) => {
