@@ -19,6 +19,7 @@ async function main() {
   })
 
   startWebserver()
+  startWorkerMonitor()
 }
 
 function startWebserver() {
@@ -33,14 +34,11 @@ function startWebserver() {
   app.put('/worker/status', (req, res) => {
     if ('uuid' in req.body && 'url' in req.body) {
       workersStatus.set(req.body.uuid, { ...req.body, updatedAt: Date.now() })
-      console.log(workersStatus)
       return res.status(200).json()
     } else {
       return res.status(400).json()
     }
   })
-
-  // TODO: setup a timer to teardown unavaliable workers
 
   app.post('/client/rooms', async (req, res) => {
     const { roomName } = req.body
@@ -76,7 +74,6 @@ function startWebserver() {
 
   roomRouter.use('/client/rooms/:roomName', async (req, res, next) => {
     const { roomName } = req.params
-    console.log(roomName, req.params, req.path)
     const workerUrl = findWorkerUrlByRoomName(roomName)
     if (!workerUrl) {
       return res.status(503).json({ error: 'No worker found' })
@@ -272,6 +269,27 @@ function startWebserver() {
   httpServer.listen(PORT, () => {
     console.log(`${packageJson.name} listening HTTP in port ${PORT}`)
   })
+}
+
+function startWorkerMonitor() {
+  const intervalMilliseconds =
+    parseInt(process.env.WORKER_MONITOR_INTERVAL_SECS) * 1000
+
+  setInterval(() => {
+    const dateTimeNow = new Date().getTime()
+
+    Array.from(workersStatus.values()).forEach((workerStatus) => {
+      const dateTimeDiffSecs = Math.floor(
+        (dateTimeNow - workerStatus.updatedAt) / 1000
+      )
+      if (dateTimeDiffSecs > parseInt(process.env.MAX_WORKER_TIMEOUT_SECS)) {
+        // TODO: shutdown the machine
+        workersStatus.delete(workerStatus.uuid)
+      }
+    })
+
+    console.info(workersStatus)
+  }, intervalMilliseconds)
 }
 
 function findWorkerUrlByRoomName(roomName) {
