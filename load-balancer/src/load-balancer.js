@@ -288,11 +288,15 @@ function findWorkerUrlByRoomName(roomName) {
 function findNextAvailableWorkerUrl() {
   let url
   const workerStatus = [...workersStatus.values()]
-    .filter((workerStatus) => workerStatus.cpuPercentage <= 60.0)
+    .filter(
+      (workerStatus) =>
+        workerStatus.cpuPercentage <=
+        parseFloat(process.env.MAX_WORKER_CPU_THRESHOLD_VALUE)
+    )
     .sort(
       (a, b) =>
         a.cpuPercentage - b.cpuPercentage ||
-        a.transports.length - b.transports.length   // TODO: invert it in order to full a worker
+        a.transports.length - b.transports.length // TODO: invert it in order to full a worker
     )[0]
   if (workerStatus) {
     url = workerStatus.url
