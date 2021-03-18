@@ -299,7 +299,7 @@ function startPinger() {
 async function pingLoadBalancer() {
   try {
     const mediaWorkerStatus = getMediaWorkerStatus()
-    await axiosInstance.put(`/worker/status`, mediaWorkerStatus)
+    await axiosInstance.put(`/workers`, mediaWorkerStatus)
   } catch (error) {
     console.error(`Could not ping the load-balancer:`, error.message)
   }

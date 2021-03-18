@@ -31,13 +31,30 @@ function startWebserver() {
   app.use(express.urlencoded({ extended: true }))
   app.use(logger('dev'))
 
-  app.put('/worker/status', (req, res) => {
+  app.put('/workers', (req, res) => {
     if ('uuid' in req.body && 'url' in req.body) {
-      workersStatus.set(req.body.uuid, { ...req.body, updatedAt: Date.now() })
+      const isDraining = !!workersStatus.get(req.body.uuid)?.isDraining
+      workersStatus.set(req.body.uuid, {
+        ...req.body,
+        updatedAt: Date.now(),
+        isDraining,
+      })
       return res.status(200).json()
     } else {
       return res.status(400).json()
     }
+  })
+
+  app.delete('/workers/:uuid', (req, res) => {
+    const { uuid } = req.params
+
+    const worker = workersStatus.get(uuid)
+
+    if (!worker) {
+      return res.status(404).json({ error: 'worker not found' })
+    }
+    workersStatus.set(uuid, { ...worker, isDraining: true })
+    return res.status(200).json({ uuid, isDraining: true })
   })
 
   app.post('/client/rooms', async (req, res) => {
@@ -306,6 +323,7 @@ function findWorkerUrlByRoomName(roomName) {
 function findNextAvailableWorkerUrl() {
   let url
   const workerStatus = [...workersStatus.values()]
+    .filter((workerStatus) => !workerStatus.isDraining)
     .filter(
       (workerStatus) =>
         workerStatus.cpuPercentage <=
