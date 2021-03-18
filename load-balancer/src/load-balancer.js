@@ -28,7 +28,7 @@ function startWebserver() {
   const roomRouter = express.Router()
 
   app.use(express.json())
-  app.use(express.urlencoded())
+  app.use(express.urlencoded({ extended: true }))
   app.use(logger('dev'))
 
   app.put('/worker/status', (req, res) => {
