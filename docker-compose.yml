@@ -1,0 +1,82 @@
+version: '3'
+networks:
+  webrtc:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+services:
+  client:
+    image: poc-mediasoup-room/client
+    build:
+      context: ./client/
+    networks:
+        webrtc:
+            ipv4_address: 172.20.0.5      
+    ports:
+      - '3000:80'
+  signaling-server:
+    image: poc-mediasoup-room/signaling-server
+    build:
+      context: ./signaling-server/
+    networks:
+        webrtc:
+            ipv4_address: 172.20.0.6       
+    ports:
+      - '8081:8081'
+    links:
+      - load-balancer
+    environment:
+      - API_BASE_URL=http://load-balancer:8082/client/
+  load-balancer:
+    image: poc-mediasoup-room/load-balancer
+    build:
+      context: ./load-balancer/
+    networks:
+        webrtc:
+            ipv4_address: 172.20.0.7      
+    ports:
+      - '8082:8082'
+  media-worker-alpha:
+    image: poc-mediasoup-room/media-worker
+    build:
+      context: ./media-worker
+    networks:
+        webrtc:
+            ipv4_address: 172.20.0.8     
+    ports:
+      - '8083:8083'
+      - '59900-59920:59900-59920/udp'
+      - '59900-59920:59900-59920/tcp'
+    links:
+      - load-balancer
+    environment:
+      - PORT=8083      
+      - WORKER_UUID=media-worker-alpha
+      - LOAD_BALANCER_BASE_URL=http://load-balancer:8082
+      - SELF_BASE_URL=http://media-worker-alpha:8083
+      - LISTEN_IP=172.20.0.8
+      - ANNOUNCED_IP=127.0.0.1
+      - RTC_MIN_PORT=59900
+      - RTC_MAX_PORT=59920
+  media-worker-bravo:
+    image: poc-mediasoup-room/media-worker
+    build:
+      context: ./media-worker
+    networks:
+        webrtc:
+            ipv4_address: 172.20.0.9
+    ports:
+      - '8084:8084'
+      - '59930-59950:59930-59950/udp'
+      - '59930-59950:59930-59950/tcp'
+    links:
+      - load-balancer
+    environment:
+      - PORT=8084
+      - WORKER_UUID=media-worker-bravo
+      - LOAD_BALANCER_BASE_URL=http://load-balancer:8082
+      - SELF_BASE_URL=http://media-worker-bravo:8084
+      - LISTEN_IP=172.20.0.9
+      - ANNOUNCED_IP=127.0.0.1
+      - RTC_MIN_PORT=59930
+      - RTC_MAX_PORT=59950

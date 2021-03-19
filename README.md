@@ -1,19 +1,23 @@
 # poc-mediasoup-room
 
-A POC of a videochat room web app using mediasoup.
+A POC of a videochat room web app using two mediasoup workers and one load-balancer.
 
-### Deploy
-Install [gulp-cli](https://gulpjs.com/) globally, then:
+## Build images
 
 ```
-$ cd server/
-$ gulp
-$ cd ../dist/
-$ rsync -avz . -e "ssh -i ~/mediasoup-dev.pem" ec2-user@34.214.137.64:~/poc-mediasoup-room/
+$ docker-compose build
 ```
 
-Check this out [here](https://mediasoup-dev.happysurgeon.com/).
+## Start containers
+
+```
+$ docker-compose up
+```
+
+## Access client
+
+<http://localhost:3000>
 
 ### Known Issues
 
-When running both server and client locally on Firefox, you have to set `media.peerconnection.ice.loopback` to `true` on `about:config`.
+When running both media-worker and client locally on Firefox, you have to set `media.peerconnection.ice.loopback` to `true` on `about:config`.

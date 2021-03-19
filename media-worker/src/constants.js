@@ -13,6 +13,8 @@ export const WORKER_SETTINGS = {
     // 'simulcast',
     // 'svc'
   ],
+  rtcMinPort: parseInt(process.env.RTC_MIN_PORT) || 10000,
+  rtcMaxPort: parseInt(process.env.RTC_MAX_PORT) || 59999,
 }
 
 export const MEDIA_CODECS = [
